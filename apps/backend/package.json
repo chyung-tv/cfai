@@ -1,0 +1,34 @@
+{
+  "name": "backend",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "dev": "motia dev -p 3001"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "@ai-sdk/google": "^2.0.44",
+    "@ai-sdk/react": "^2.0.106",
+    "@motiadev/adapter-bullmq-events": "^0.14.0-beta.164",
+    "@motiadev/core": "^0.14.0-beta.164",
+    "@motiadev/plugin-bullmq": "^0.14.0-beta.164",
+    "@motiadev/plugin-endpoint": "^0.14.0-beta.164",
+    "@motiadev/plugin-logs": "^0.14.0-beta.164",
+    "@motiadev/plugin-observability": "^0.14.0-beta.164",
+    "@motiadev/plugin-states": "^0.14.0-beta.164",
+    "@repo/db": "workspace:^",
+    "ai": "^5.0.106",
+    "motia": "^0.14.0-beta.164",
+    "zod": "^4.1.13"
+  },
+  "devDependencies": {
+    "@types/react": "^19.1.1",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.7.3"
+  }
+}

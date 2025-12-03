@@ -1,0 +1,111 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// User (Managed by NextAuth)
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String?   @unique
+  emailVerified DateTime?
+  image         String?
+
+  // Access Control: default false means "Closed Beta"
+  hasAccess Boolean @default(false)
+
+  accounts Account[]
+  sessions Session[]
+
+  // Track user queries
+  queries UserQuery[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// Store the core analysis to cache results (One record per Ticker per Day/TTL)
+model AnalysisResult {
+  id       String @id @default(cuid())
+  ticker   String // e.g., "AAPL"
+  price    Float // Price at time of analysis
+  currency String @default("USD")
+
+  // The Qualitative Verdict
+  verdictLabel String // "Very Likely", "Unlikely", etc.
+  verdictText  String @db.Text // AI explanation
+
+  // Structured Financial Data (Simplified for querying)
+  ttmRevenue      Float
+  ttmNetIncome    Float
+  ttmFreeCashFlow Float
+
+  // Reverse DCF Outputs
+  impliedGrowthRate Float // The growth rate required to justify the price
+  discountRateUsed  Float // The discount rate used for the calculation
+
+  // Complex Data (Stored as JSON for flexibility)
+  // Contains the Sensitivity Table: { "8%": { "5%": 120, "10%": 140 }, ... }
+  sensitivityMatrix Json
+
+  // Full financial data from FMP if we need to display raw stats later
+  rawFinancials Json?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Link to user queries (optional: helps see who asked for what)
+  userQueries UserQuery[]
+
+  @@index([ticker])
+}
+
+// Logs of who asked for what (useful for history/usage limits)
+model UserQuery {
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id])
+
+  ticker String
+
+  analysisResultId String
+  analysisResult   AnalysisResult @relation(fields: [analysisResultId], references: [id])
+
+  createdAt DateTime @default(now())
+}
+
+// NextAuth Standard Models...
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
