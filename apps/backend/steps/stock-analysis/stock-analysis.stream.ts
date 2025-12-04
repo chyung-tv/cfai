@@ -2,17 +2,27 @@
 import { z } from "zod";
 import { StreamConfig } from "motia";
 import { dcfResultSchema } from "./dcf.step";
-import { ProjectionSchema } from "../lib/ai-functions/projection-judge";
+import { growthJudgementSchema } from "./judgement.step";
 import { ratingSchema } from "../lib/ai-functions/rating";
 import { thesisSchema } from "../lib/ai-functions/parseThesis";
 
 // Define the packed data schema
 export const packedDataSchema = z.object({
+  id: z.string(),
   symbol: z.string(),
-  dcfData: dcfResultSchema,
-  structuredThesis: thesisSchema, // Now fully typed!
-  projectionJudgeData: ProjectionSchema,
-  ratingData: ratingSchema,
+  price: z.number(),
+  score: z.number(),
+  tier: z.string(),
+  moat: z.string(),
+  valuationStatus: z.string(),
+  thesis: thesisSchema,
+  dcf: dcfResultSchema,
+  financials: z.object({
+    revenue: z.number(),
+    netIncome: z.number(),
+    fcf: z.number(),
+    netDebt: z.number(),
+  }),
 });
 
 // Define the complete stream schema

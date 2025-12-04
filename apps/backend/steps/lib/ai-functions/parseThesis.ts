@@ -17,12 +17,39 @@ export const thesisSchema = z.object({
       .describe(
         "Durability and sources of competitive advantage and economic moat."
       ),
-    porter: z
+  }),
+  porter: z.object({
+    threatOfEntrants: z
       .string()
-      .describe("Porter's 5 forces and competitive advantage details."),
-    drivers: z
+      .describe("Barriers to entry, economies of scale, brand identity."),
+    bargainingPowerSuppliers: z
       .string()
-      .describe("External and internal drivers for growth or decline"),
+      .describe(
+        "Supplier concentration, switching costs, forward integration."
+      ),
+    bargainingPowerBuyers: z
+      .string()
+      .describe("Buyer volume, price sensitivity, product differentiation."),
+    threatOfSubstitutes: z
+      .string()
+      .describe("Relative price performance of substitutes, switching costs."),
+    competitiveRivalry: z
+      .string()
+      .describe("Industry growth, product differences, brand identity."),
+  }),
+  drivers: z.object({
+    externalTailwinds: z
+      .string()
+      .describe("Market growth, favorable regulation, demographic shifts."),
+    externalHeadwinds: z
+      .string()
+      .describe("Macroeconomic drag, competition, regulatory hurdles."),
+    internalCatalysts: z
+      .string()
+      .describe("Innovation, efficiency improvements, new product launches."),
+    internalDrags: z
+      .string()
+      .describe("Legacy debt, culture issues, operational inefficiencies."),
   }),
   managementProfile: z.object({
     leadership: z.string().describe("Key managers, tenure, and impact."),

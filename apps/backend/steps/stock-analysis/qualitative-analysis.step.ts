@@ -28,13 +28,12 @@ export const handler: Handlers["ProcessStockAnalysis"] = async (
   await streams["stock-analysis-stream"].set("analysis", traceId, {
     id: traceId,
     symbol,
-    status: "Perplexity is analyzing the stock...",
+    status: "Gemini is analyzing the stock...",
   });
 
   // Generate comprehensive qualitative analysis (text-based)
-  const { text: analysisThesis, reasoning } = await qualitativeStockAnalysis(
-    symbol
-  );
+  const { text: analysisThesis, reasoning } =
+    await qualitativeStockAnalysis(symbol);
 
   logger.info(`Stock analysis completed for ${symbol}, storing in state...`, {
     traceId,
@@ -43,7 +42,7 @@ export const handler: Handlers["ProcessStockAnalysis"] = async (
   await streams["stock-analysis-stream"].set("analysis", traceId, {
     id: traceId,
     symbol,
-    status: "Perplexity has finished analyzing the stock.",
+    status: "Gemini has finished analyzing the stock.",
   });
 
   // Store full analysis thesis and reasoning for downstream steps

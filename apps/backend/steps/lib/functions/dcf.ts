@@ -2,12 +2,10 @@
  * DCF Valuation Model
  *
  * This module implements a Discounted Cash Flow (DCF) valuation model that:
- * - Fetches TTM financial data automatically
+ * - Uses provided TTM financial data
  * - Projects future cash flows based on AI-provided growth assumptions
  * - Calculates intrinsic value per share using the Gordon Growth Model
  */
-
-import { fetchFinancialReportData } from "./ttmReport";
 
 // ============================================================================
 // TYPE DEFINITIONS
@@ -22,6 +20,12 @@ export type DCFInputs = {
     revenueGrowthRates: number[]; // e.g., [0.15, 0.12, 0.10, 0.08, 0.06]
     terminalGrowthRate: number; // e.g., 0.03 for 3%
     discountRate: number; // e.g., 0.10 for 10%
+  };
+  financials: {
+    revenueTTM: number;
+    fcfTTM: number;
+    sharesOutstanding: number;
+    netDebt: number;
   };
 };
 
@@ -54,45 +58,21 @@ export async function performCustomDCF(inputs: DCFInputs) {
   console.log("\n=== Performing custom DCF valuation ===");
   console.log("Symbol:", inputs.symbol);
   console.log("AI Params:", inputs.aiParams);
-  const { symbol, aiParams } = inputs;
+  const { symbol, aiParams, financials } = inputs;
 
   // --------------------------------------------------------------------------
-  // Step 1: Fetch Financial Data
+  // Step 1: Use Provided Financial Data
   // --------------------------------------------------------------------------
 
-  console.log("\n[Step 1] Fetching financial data for", symbol, "...");
-  const financialData = await fetchFinancialReportData(symbol);
+  console.log("\n[Step 1] Using provided financial data for", symbol, "...");
 
-  if (!financialData) {
-    console.error(`❌ Failed to fetch financial data for ${symbol}`);
-    return null;
-  }
-  console.log("✅ Financial data fetched successfully");
+  const { revenueTTM, fcfTTM, sharesOutstanding, netDebt } = financials;
 
-  const { balanceSheet, incomeStatement, cashflowStatement } = financialData;
-
-  // Extract required metrics
-  const revenueTTM = incomeStatement.revenue;
-  const fcfTTM = cashflowStatement.freeCashFlow;
-  const sharesOutstanding = incomeStatement.weightedAverageShsOutDil;
-  const netDebt = balanceSheet.netDebt;
-
-  console.log("\nExtracted Metrics:");
+  console.log("\nMetrics:");
   console.log("  Revenue (TTM):", revenueTTM?.toLocaleString());
   console.log("  FCF (TTM):", fcfTTM?.toLocaleString());
   console.log("  Shares Outstanding:", sharesOutstanding?.toLocaleString());
   console.log("  Net Debt:", netDebt?.toLocaleString());
-
-  // Validate data completeness
-  if (
-    revenueTTM === undefined ||
-    fcfTTM === undefined ||
-    sharesOutstanding === undefined ||
-    netDebt === undefined
-  ) {
-    console.error("❌ Missing required financial metrics");
-    return null;
-  }
 
   // Validate data sanity
   if (revenueTTM <= 0 || sharesOutstanding <= 0) {

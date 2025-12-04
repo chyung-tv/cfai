@@ -8,11 +8,17 @@ import { EventHandler, ApiRouteHandler, ApiResponse, MotiaStream, CronHandler } 
 
 declare module 'motia' {
   interface FlowContextStateStreams {
-    
+    'stock-analysis-stream': MotiaStream<{ id: string; symbol: string; status: string; data?: { id: string; symbol: string; price: number; score: number; tier: string; moat: string; valuationStatus: string; thesis: { executiveSummary: string; businessProfile: { essence: string; moat: string }; porter: { threatOfEntrants: string; bargainingPowerSuppliers: string; bargainingPowerBuyers: string; threatOfSubstitutes: string; competitiveRivalry: string }; drivers: { externalTailwinds: string; externalHeadwinds: string; internalCatalysts: string; internalDrags: string }; managementProfile: { leadership: string; compensationAlignment: string }; industryProfile: { growthProjections: number; trends: string; competition: string }; recentDevelopments: string }; dcf: { intrinsicValuePerShare: number; impliedMargin: number; usedDiscountRate: number; sumPvFcf: number; terminalValue: number; presentTerminalValue: number; enterpriseValue: number; equityValue: number; projections: Array<{ year: number; revenue: number; fcf: number; pvFCF: number }>; upsideDownside: number; sensitivity: { terminalGrowthRates: Array<number>; discountRates: Array<number>; values: Array<Array<number>> } }; financials: { revenue: number; netIncome: number; fcf: number; netDebt: number } } }>
   }
 
   interface Handlers {
-    
+    'StockAnalysisAPI': ApiRouteHandler<Record<string, unknown>, ApiResponse<200, { message: string; status: string; traceId: string }>, { topic: 'process-stock-analysis'; data: { symbol: string } }>
+    'ProcessReverseDcfAnalysis': EventHandler<{ symbol: string }, { topic: 'finish-reverse-dcf-analysis'; data: { symbol: string } }>
+    'return-db': EventHandler<{ symbol: string }, never>
+    'RateStock': EventHandler<{ symbol: string }, { topic: 'finish-stock-rating'; data: { symbol: string } }>
+    'ProcessStockAnalysis': EventHandler<{ symbol: string }, { topic: 'finish-stock-qualitative-analysis'; data: { symbol: string } }>
+    'ProcessGrowthJudgement': EventHandler<{ symbol: string }, { topic: 'finish-growth-judgement'; data: { symbol: string } }>
+    'DCF': EventHandler<{ symbol: string }, { topic: 'finish-dcf'; data: { symbol: string } }>
   }
     
 }

@@ -1,6 +1,6 @@
 import { EventConfig, Handlers } from "motia";
 import { rateStock } from "../lib/ai-functions/rating";
-import { ProjectionSchema } from "../lib/ai-functions/projection-judge";
+import { growthJudgementSchema } from "./judgement.step";
 import z from "zod";
 import { dcfResultSchema } from "./dcf.step";
 import { qualitativeAnalysisSchema } from "./qualitative-analysis.step";
@@ -46,9 +46,9 @@ export const handler: Handlers["RateStock"] = async (
     logger
   );
 
-  const projectionJudgeData = await getValidatedState(
-    "projection-judge",
-    ProjectionSchema,
+  const growthJudgementData = await getValidatedState(
+    "growth-judgement",
+    growthJudgementSchema,
     state,
     traceId,
     logger
@@ -61,7 +61,7 @@ export const handler: Handlers["RateStock"] = async (
     symbol,
     dcfData,
     qualitativeAnalysisData,
-    projectionJudgeData,
+    growthJudgementData,
   };
 
   logger.info("Generating stock rating", { symbol, traceId });

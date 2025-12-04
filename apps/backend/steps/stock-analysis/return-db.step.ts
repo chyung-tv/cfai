@@ -1,13 +1,12 @@
 import { EventConfig, Handlers } from "motia";
 import { getValidatedState } from "../lib/statehooks";
 import z from "zod";
-import { prisma } from "../../lib/db";
 import { qualitativeAnalysisSchema } from "./qualitative-analysis.step";
-import { ProjectionSchema } from "../lib/ai-functions/projection-judge";
+import { growthJudgementSchema } from "./judgement.step";
 import { dcfResultSchema } from "./dcf.step";
 import { ratingSchema } from "../lib/ai-functions/rating";
 import { parseThesis } from "../lib/ai-functions/parseThesis";
-import type { StockAnalysisStreamData } from "./stock-analysis.stream";
+import { reverseDcfAnalysisSchema } from "./reverse-dcf.step";
 
 const inputSchema = z.object({
   symbol: z.string(),
@@ -50,9 +49,9 @@ export const handler: Handlers["return-db"] = async (
     logger
   );
 
-  const projectionJudgeData = await getValidatedState(
-    "projection-judge",
-    ProjectionSchema,
+  const growthJudgementData = await getValidatedState(
+    "growth-judgement",
+    growthJudgementSchema,
     state,
     traceId,
     logger
@@ -65,35 +64,62 @@ export const handler: Handlers["return-db"] = async (
     traceId,
     logger
   );
+
+  const reverseDcfData = await getValidatedState(
+    "reverse-dcf-analysis",
+    reverseDcfAnalysisSchema,
+    state,
+    traceId,
+    logger
+  );
+
   logger.info("All state data validated successfully", { traceId });
   logger.info("Parsing thesis", { traceId });
   const structuredThesis = await parseThesis(thesis);
   logger.info("Thesis parsed successfully", { traceId });
   logger.info("Packing data", { traceId });
-  const packedData = {
+
+  // Construct the AnalysisResult object matching Prisma schema
+  const analysisResult = {
+    id: traceId,
     symbol,
-    dcfData,
-    structuredThesis,
-    projectionJudgeData,
-    ratingData,
+    price: reverseDcfData.currentPrice,
+    score: 0, // Placeholder
+    tier: ratingData.tier.classification,
+    moat: ratingData.economicMoat.primaryMoat,
+    valuationStatus: growthJudgementData.verdict,
+    thesis: structuredThesis,
+    dcf: dcfData,
+    financials: {
+      revenue: reverseDcfData.ttmRevenue,
+      netIncome: 0, // Not currently persisted in reverse-dcf state
+      fcf: reverseDcfData.ttmFreeCashFlow,
+      netDebt: reverseDcfData.netDebt,
+    },
   };
 
-  // Save to database for caching
-  logger.info("Saving analysis to database", { traceId });
-  await prisma.analysis.create({
+  // save to db
+  logger.info("Saving analysis result to database", { traceId });
+
+  // Dynamic import to avoid initialization issues during build/typegen
+  const { default: prisma } = await import("@repo/db");
+
+  await prisma.analysisResult.create({
     data: {
-      id: traceId,
-      symbol,
-      data: packedData as any, // Store as JSON
-    },
+      ...analysisResult,
+      // Ensure JSON fields are correctly typed for Prisma
+      thesis: analysisResult.thesis,
+      dcf: analysisResult.dcf,
+      financials: analysisResult.financials,
+    } as any,
   });
-  logger.info("Analysis saved to database successfully", { traceId });
+  logger.info("Analysis result saved to database", { traceId });
 
   await streams["stock-analysis-stream"].set("analysis", traceId, {
     id: traceId,
     symbol,
     status: "Analysis completed",
-    data: packedData,
+    data: analysisResult,
   });
   return;
 };

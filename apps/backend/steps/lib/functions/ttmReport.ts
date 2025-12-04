@@ -1,6 +1,6 @@
 import { config } from "dotenv";
+// Load environment variables from .env.local
 config({ path: ".env.local" });
-
 import z from "zod";
 
 export const balanceSheetDataSchema = z.array(
@@ -216,11 +216,15 @@ function extractMetadata<T extends Record<string, any>>(
 
 export async function fetchFinancialReportData(symbol: string) {
   const fmpApiKey = process.env.FMP_API_KEY;
-  const baseURL = process.env.FMP_BASE_URL;
+  let baseURL = process.env.FMP_BASE_URL;
 
-  if (!fmpApiKey || !baseURL) {
-    console.error("FMP API Key or Base URL is not set in .env.local");
+  if (!fmpApiKey) {
+    console.error("FMP API Key is not set in .env.local");
     return null;
+  }
+
+  if (baseURL && !baseURL.endsWith("/")) {
+    baseURL = `${baseURL}/`;
   }
 
   // Define the URLs for the API calls

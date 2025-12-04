@@ -1,6 +1,6 @@
 import { QualitativeAnalysis } from "../../stock-analysis/qualitative-analysis.step";
 import { DCFResult } from "../functions/dcf";
-import { ProjectionResult } from "./projection-judge";
+import { GrowthJudgement } from "../../stock-analysis/judgement.step";
 import { generateObject } from "ai";
 import { z } from "zod";
 import { google } from "./ai";
@@ -9,7 +9,7 @@ type RatingInput = {
   symbol: string;
   dcfData: NonNullable<DCFResult>; // Data is validated in rating.step.ts before calling this function
   qualitativeAnalysisData: QualitativeAnalysis;
-  projectionJudgeData: ProjectionResult;
+  growthJudgementData: GrowthJudgement;
 };
 
 // Comprehensive Stock Rating Schema
@@ -186,7 +186,7 @@ export const ratingSchema = z.object({
 export type StockRating = z.infer<typeof ratingSchema>;
 
 export async function rateStock(input: RatingInput): Promise<StockRating> {
-  const { symbol, dcfData, qualitativeAnalysisData, projectionJudgeData } =
+  const { symbol, dcfData, qualitativeAnalysisData, growthJudgementData } =
     input;
 
   console.log(`\n=== Generating comprehensive rating for ${symbol} ===`);
@@ -197,7 +197,7 @@ export async function rateStock(input: RatingInput): Promise<StockRating> {
 Your task is to provide a comprehensive investment rating by synthesizing:
 1. DCF valuation results (intrinsic value, margin analysis, projections)
 2. Qualitative business analysis (competitive position, management, industry dynamics)
-3. Projection quality assessment (growth assumptions, margin sustainability)
+3. Growth Feasibility Judgement (AI's independent view vs Market expectations)
 
 Be rigorous, objective, and conservative in your assessments. Consider both bull and bear cases.`;
 
@@ -210,35 +210,26 @@ Be rigorous, objective, and conservative in your assessments. Consider both bull
 - Enterprise Value: $${dcfData.enterpriseValue.toLocaleString()}
 - Equity Value: $${dcfData.equityValue.toLocaleString()}
 
-**Projection Quality:**
-- Audit Status: ${
-    projectionJudgeData.audit.isLegitimate ? "LEGITIMATE" : "QUESTIONABLE"
-  }
-- Optimism Check: ${projectionJudgeData.audit.optimismCheck}
-- Consistency Check: ${projectionJudgeData.audit.consistencyCheck}
-${
-  projectionJudgeData.audit.correctionNeeded
-    ? `- Concerns: ${projectionJudgeData.audit.correctionNeeded}`
-    : ""
-}
-- Terminal Growth Rate: ${(
-    projectionJudgeData.terminalGrowth.rate * 100
-  ).toFixed(2)}% (${projectionJudgeData.terminalGrowth.keyAssumption})
-- Discount Rate: ${(projectionJudgeData.discount.rate * 100).toFixed(2)}% (${
-    projectionJudgeData.discount.keyAssumption
-  })
+**Growth Feasibility Judgement:**
+- AI Independent Prediction (5y CAGR): ${(
+    growthJudgementData.independentPrediction.predictedCagr * 100
+  ).toFixed(2)}%
+- Confidence: ${(
+    growthJudgementData.independentPrediction.confidence * 100
+  ).toFixed(0)}%
+- Verdict: ${growthJudgementData.verdict}
+- Reasoning: ${growthJudgementData.reasoning.join("; ")}
 
-**10-Year Revenue Projections:**
-${projectionJudgeData.revProjections
-  .map(
-    (p) =>
-      `Year ${p.year}: $${p.revenue.toLocaleString()} (${(
-        p.growthRate * 100
-      ).toFixed(1)}% growth, ${(p.operatingMargin * 100).toFixed(
-        1
-      )}% margin) - ${p.keyAssumption}`
-  )
-  .join("\n")}
+**DCF Assumptions Used:**
+- Revenue Growth (Next 5 Years): ${growthJudgementData.dcfAssumptions.revenueGrowthRates
+    .map((r) => (r * 100).toFixed(1) + "%")
+    .join(", ")}
+- Terminal Growth: ${(
+    growthJudgementData.dcfAssumptions.terminalGrowthRate * 100
+  ).toFixed(2)}%
+- Discount Rate: ${(
+    growthJudgementData.dcfAssumptions.discountRate * 100
+  ).toFixed(2)}%
 
 **Qualitative Analysis:**
 ${qualitativeAnalysisData.thesis}
@@ -249,7 +240,7 @@ ${qualitativeAnalysisData.reasoning}
 Based on this comprehensive analysis, provide your detailed investment rating covering all aspects: business quality tier, economic moat, industry trends, market structure, portfolio function, and actionable recommendation.`;
 
   const result = await generateObject({
-    model: google("gemini-2.5-pro"),
+    model: google("gemini-2.5-flash"),
     schema: ratingSchema,
     messages: [
       {

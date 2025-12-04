@@ -1,9 +1,13 @@
-import { perplexity } from "./ai";
+import { GoogleGenerativeAIProviderMetadata } from "@ai-sdk/google";
+import { google } from "./ai";
 import { generateText } from "ai";
 
 export async function qualitativeStockAnalysis(symbol: string) {
-  const { reasoning, text } = await generateText({
-    model: perplexity("sonar"),
+  const { text, reasoning, providerMetadata } = await generateText({
+    model: google("gemini-2.5-pro"),
+    tools: {
+      googleSearch: google.tools.googleSearch({}),
+    },
     system: `You are a senior equity research analyst conducting comprehensive fundamental analysis for institutional investors. Your analysis will inform investment decisions and financial modeling, so prioritize:
 
 1. DEPTH over brevity - provide extensive analysis with supporting evidence
@@ -60,10 +64,11 @@ For every significant claim, include inline citations [URL]. When data is unavai
 
 Provide specific numbers, timeframes, and sources. Aim for 1500-2500 words of substantive analysis.`,
     providerOptions: {
-      perplexity: {
-        temperature: 0.3,
+      google: {
+        temperature: 0.2,
       },
     },
   });
-  return { reasoning, text };
+
+  return { text, reasoning };
 }

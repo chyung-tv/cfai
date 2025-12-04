@@ -103,7 +103,7 @@ export async function generateVerifiedProjections(
     console.log(`Attempt ${attempt + 1} for ${ticker}...`);
 
     const result = await generateObject({
-      model: google("gemini-2.5-pro"),
+      model: google("gemini-2.5-flash"),
       schema: ProjectionSchema,
       messages: messages,
       temperature: 0.3 + attempt * 0.1,
