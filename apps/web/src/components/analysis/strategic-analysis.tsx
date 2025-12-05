@@ -16,41 +16,10 @@ import {
   Globe,
   AlertTriangle,
 } from "lucide-react";
-
-// Define the schema interface based on parseThesis.ts
-export interface StructuredThesis {
-  executiveSummary: string;
-  businessProfile: {
-    essence: string;
-    moat: string;
-  };
-  porter: {
-    threatOfEntrants: string;
-    bargainingPowerSuppliers: string;
-    bargainingPowerBuyers: string;
-    threatOfSubstitutes: string;
-    competitiveRivalry: string;
-  };
-  drivers: {
-    externalTailwinds: string;
-    externalHeadwinds: string;
-    internalCatalysts: string;
-    internalDrags: string;
-  };
-  managementProfile: {
-    leadership: string;
-    compensationAlignment: string;
-  };
-  industryProfile: {
-    growthProjections: number;
-    trends: string;
-    competition: string;
-  };
-  recentDevelopments: string;
-}
+import type { StockQualitativeAnalysis } from "@repo/types";
 
 interface StrategicAnalysisProps {
-  thesis: StructuredThesis;
+  thesis: StockQualitativeAnalysis;
 }
 
 export function StrategicAnalysis({ thesis }: StrategicAnalysisProps) {
@@ -128,10 +97,7 @@ export function StrategicAnalysis({ thesis }: StrategicAnalysisProps) {
                     Proj. Industry CAGR
                   </div>
                   <div className="text-3xl font-bold text-slate-900 dark:text-slate-100 mt-1">
-                    {(thesis.industryProfile.growthProjections * 100).toFixed(
-                      1
-                    )}
-                    %
+                    {thesis.industryProfile.growthProjections.toFixed(1)}%
                   </div>
                 </CardContent>
               </Card>

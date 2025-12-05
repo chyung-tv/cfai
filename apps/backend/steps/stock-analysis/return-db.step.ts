@@ -89,13 +89,19 @@ export const handler: Handlers["return-db"] = async (
     moat: ratingData.economicMoat.primaryMoat,
     valuationStatus: growthJudgementData.verdict,
     thesis: structuredThesis,
-    dcf: dcfData,
+    dcf: {
+      ...dcfData,
+      // Include growth judgement scenarios and independent prediction
+      scenarios: growthJudgementData.scenarios,
+      independentPrediction: growthJudgementData.independentPrediction,
+    },
     financials: {
       revenue: reverseDcfData.ttmRevenue,
       netIncome: 0, // Not currently persisted in reverse-dcf state
       fcf: reverseDcfData.ttmFreeCashFlow,
       netDebt: reverseDcfData.netDebt,
     },
+    rating: ratingData,
   };
 
   // save to db
@@ -111,15 +117,27 @@ export const handler: Handlers["return-db"] = async (
       thesis: analysisResult.thesis,
       dcf: analysisResult.dcf,
       financials: analysisResult.financials,
+      rating: analysisResult.rating,
     } as any,
   });
   logger.info("Analysis result saved to database", { traceId });
 
+  // Send final completion status
   await streams["stock-analysis-stream"].set("analysis", traceId, {
     id: traceId,
     symbol,
     status: "Analysis completed",
-    data: analysisResult,
   });
+
+  // Clean up stream data after a short delay to allow client to receive completion
+  setTimeout(async () => {
+    try {
+      await streams["stock-analysis-stream"].delete("analysis", traceId);
+      logger.info("Stream data cleaned up", { traceId });
+    } catch (e) {
+      logger.warn("Failed to clean up stream data", { traceId, error: e });
+    }
+  }, 5000);
+
   return;
 };

@@ -65,11 +65,8 @@ export const handler: Handlers["ProcessStockAnalysis"] = async (
   logger.info("Event emitted successfully. Proceeding to next step");
 };
 
-export const qualitativeAnalysisSchema = z.object({
-  symbol: z.string(),
-  thesis: z.string(),
-  reasoning: z.array(z.string()),
-  generatedAt: z.string(),
-});
-
-export type QualitativeAnalysis = z.infer<typeof qualitativeAnalysisSchema>;
+// Re-export from shared types package
+export {
+  qualitativeAnalysisSchema,
+  type QualitativeAnalysis,
+} from "@repo/types";

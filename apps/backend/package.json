@@ -22,6 +22,7 @@
     "@motiadev/plugin-observability": "^0.14.0-beta.164",
     "@motiadev/plugin-states": "^0.14.0-beta.164",
     "@repo/db": "workspace:^",
+    "@repo/types": "workspace:^",
     "ai": "^5.0.106",
     "motia": "^0.14.0-beta.164",
     "zod": "^4.1.13"

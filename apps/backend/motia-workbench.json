@@ -20,17 +20,21 @@
         "x": -216,
         "y": 0
       },
+      "steps/stock-analysis/reverse-dcf.step.ts": {
+        "x": 242,
+        "y": 93
+      },
+      "steps/stock-analysis/return-db.step.ts": {
+        "x": 1104,
+        "y": 122
+      },
       "steps/stock-analysis/rating.step.ts": {
         "x": 1039,
         "y": -73
       },
       "steps/stock-analysis/qualitative-analysis.step.ts": {
-        "x": 243,
-        "y": -64
-      },
-      "steps/stock-analysis/reverse-dcf.step.ts": {
-        "x": 242,
-        "y": 93
+        "x": 231,
+        "y": -66
       },
       "steps/stock-analysis/judgement.step.ts": {
         "x": 630,
@@ -39,10 +43,6 @@
       "steps/stock-analysis/dcf.step.ts": {
         "x": 656,
         "y": 114
-      },
-      "steps/stock-analysis/return-db.step.ts": {
-        "x": 1104,
-        "y": 122
       }
     }
   }

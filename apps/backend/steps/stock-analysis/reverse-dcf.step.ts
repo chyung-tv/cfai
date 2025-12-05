@@ -156,18 +156,5 @@ export const handler: Handlers["ProcessReverseDcfAnalysis"] = async (
   }
 };
 
-// Export schema for downstream steps
-export const reverseDcfAnalysisSchema = z.object({
-  symbol: z.string(),
-  currentPrice: z.number(),
-  marketCap: z.number(),
-  sharesOutstanding: z.number(),
-  ttmRevenue: z.number(),
-  ttmFreeCashFlow: z.number(),
-  netDebt: z.number(),
-  fcfMargin: z.number(),
-  impliedGrowthRates: z.array(reverseDcfResultSchema),
-  generatedAt: z.string(),
-});
-
-export type ReverseDcfAnalysis = z.infer<typeof reverseDcfAnalysisSchema>;
+// Re-export from shared types package
+export { reverseDcfAnalysisSchema, type ReverseDcfAnalysis } from "@repo/types";

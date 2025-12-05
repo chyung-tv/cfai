@@ -21,16 +21,11 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { Info } from "lucide-react";
+import type { GrowthJudgement } from "@repo/types";
 
-// Type definition matching the backend schema
-type FeasibilityLevel = "VERY_HIGH" | "HIGH" | "MEDIUM" | "LOW" | "VERY_LOW";
-
-interface Scenario {
-  discountRate: number;
-  impliedGrowth: number;
-  feasibility: FeasibilityLevel;
-  gapAnalysis: string;
-}
+// Re-export types for convenience
+type FeasibilityLevel = GrowthJudgement["scenarios"][number]["feasibility"];
+type Scenario = GrowthJudgement["scenarios"][number];
 
 interface FeasibilityGaugeProps {
   scenarios: Scenario[];

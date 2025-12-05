@@ -3,10 +3,7 @@ import { z } from "zod";
 import { getValidatedState } from "../lib/statehooks";
 import { qualitativeAnalysisSchema } from "./qualitative-analysis.step";
 import { reverseDcfAnalysisSchema } from "./reverse-dcf.step";
-import {
-  evaluateGrowthFeasibility,
-  growthJudgementSchema,
-} from "../lib/ai-functions/judgement";
+import { evaluateGrowthFeasibility } from "../lib/ai-functions/judgement";
 
 const inputSchema = z.object({
   symbol: z.string(),
@@ -106,6 +103,5 @@ export const handler: Handlers["ProcessGrowthJudgement"] = async (
   logger.info("Growth judgement step completed successfully");
 };
 
-// Export schema for downstream steps
-export { growthJudgementSchema };
-export type GrowthJudgement = z.infer<typeof growthJudgementSchema>;
+// Re-export from shared types package
+export { growthJudgementSchema, type GrowthJudgement } from "@repo/types";

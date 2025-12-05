@@ -1,6 +1,7 @@
 # CFAI - AI-Powered Stock Analysis Platform
 
 ## 1. Project Architecture & Context
+
 - **Monorepo Structure**: Turborepo with two distinct services sharing a database.
   - `apps/backend`: **Motia** framework (Event-driven analysis engine). Port 3001.
   - `apps/web`: **Next.js 16** frontend (UI, Auth, Dashboard). Port 3000.
@@ -10,6 +11,7 @@
   - **Never** import backend code directly into the web app or vice versa. Use shared packages.
 
 ## 2. Backend Development (Motia Framework)
+
 - **Core Primitive**: The **Step** (`*.step.ts`).
   - **API Steps**: Handle HTTP requests (e.g., `stock-analysis-api.step.ts`).
   - **Event Steps**: Handle background logic (e.g., `dcf.step.ts`, `rating.step.ts`).
@@ -26,6 +28,7 @@
   - **Zod**: Every step **must** export its output schema (e.g., `export const dcfResultSchema = z.object(...)`).
 
 ## 3. Frontend Development (Next.js 16)
+
 - **Component Architecture**:
   - **Analysis Pillars**:
     1.  **Business Quality**: `BusinessQualityCard` (Moat, Tier, Structure).
@@ -38,7 +41,8 @@
 - **Styling**: Tailwind CSS 4. Use `lucide-react` for icons.
 
 ## 4. AI & Financial Logic
-- **AI Provider**: Vercel AI SDK (`@ai-sdk/google`) with Gemini models (`gemini-2.5-pro`, `gemini-2.0-flash-thinking`).
+
+- **AI Provider**: Vercel AI SDK (`@ai-sdk/google`) with Gemini models (e.g., `gemini-2.5-flash`).
 - **Pattern**: Use `generateObject` with strict Zod schemas for all AI outputs.
 - **Key Schemas**:
   - `growthJudgementSchema`: AI's independent growth prediction vs. market implied growth.
@@ -49,13 +53,20 @@
   - **Forward DCF**: Calculates intrinsic value from AI projections.
 
 ## 5. Critical Workflows & Commands
+
 - **Start All**: `pnpm dev` (Root).
 - **Backend Dev**: `cd apps/backend && pnpm dev` (Runs Motia Workbench at localhost:3001).
 - **Type Gen**: `cd apps/backend && npx motia generate-types` (Run frequently!).
 - **DB Migration**: `cd packages/db && npx prisma migrate dev`.
 - **Studio**: `cd packages/db && npx prisma studio`.
 
-## 6. Common Pitfalls to Avoid
+## 6. Detailed Guides & Rules
+
+- **Motia Patterns**: Refer to `.cursor/rules/motia/` for authoritative guides on API, Event, and Cron steps.
+- **Architecture**: See `.cursor/architecture/` for project structure and error handling.
+
+## 7. Common Pitfalls to Avoid
+
 - **Missing Types**: If you see `@ts-expect-error` in backend steps, run `generate-types`.
 - **Direct State Access**: Never use `state.get()` directly for complex objects; use `getValidatedState`.
 - **Overlapping UI**: Keep "Quality" (Verdict) separate from "Valuation" (Gauge). A good company can be overvalued.

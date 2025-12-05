@@ -48,8 +48,9 @@ model AnalysisResult {
 
   // Complex Data (Stored as JSON)
   thesis     Json // Full StockQualitativeAnalysis (Porter, Drivers, etc.)
-  dcf        Json // DCFResult (Sensitivity, Assumptions, Intrinsic Value)
+  dcf        Json // DCFResult (Sensitivity, Assumptions, Intrinsic Value) + Growth Scenarios
   financials Json // Key Financials { revenue, netIncome, fcf, netDebt }
+  rating     Json // StockRating (tier, moat, action, portfolio function)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
