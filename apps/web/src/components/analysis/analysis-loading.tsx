@@ -104,6 +104,15 @@ export function AnalysisLoading({ ticker }: AnalysisLoadingProps) {
           {statusMessage}
         </p>
       </div>
+      <div className="flex gap-3">
+        <Button onClick={() => router.push("/dashboard")} variant="outline">
+          View Dashboard
+        </Button>
+      </div>
+      <p className="text-xs text-muted-foreground max-w-md text-center">
+        Analysis is running in the background. You can navigate away and check
+        progress on your dashboard.
+      </p>
     </div>
   );
 }

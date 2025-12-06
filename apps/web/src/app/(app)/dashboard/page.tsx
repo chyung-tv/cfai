@@ -1,3 +1,7 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import type { PackedAnalysisData } from "@repo/types";
 import {
   Card,
   CardContent,
@@ -17,13 +21,13 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Eye,
-  Clock,
   CheckCircle2,
   XCircle,
   Loader2,
   TrendingDown,
   TrendingUp,
   Minus,
+  RefreshCw,
 } from "lucide-react";
 import Link from "next/link";
 import {
@@ -31,60 +35,27 @@ import {
   LEGITIMACY_COLORS,
   type LegitimacyLevel,
 } from "@/lib/constants";
+import {
+  getUserQueryHistory,
+  syncQueryStatus,
+  markQueryAsFailed,
+} from "@/lib/actions/dashboard";
+import { triggerAnalysis } from "@/lib/actions/analysis";
+import { useStreamGroup } from "@motiadev/stream-client-react";
 
-// Mock data - replace with actual API fetch
-const mockAnalyses = [
-  {
-    id: "1",
-    symbol: "AAPL",
-    status: "completed",
-    impliedGrowth: 18,
-    aiPredictedGrowth: 14, // Gap: +4% → Fair (Yellow)
-    createdAt: new Date("2025-12-03T10:30:00"),
-  },
-  {
-    id: "2",
-    symbol: "GOOGL",
-    status: "processing",
-    impliedGrowth: null,
-    aiPredictedGrowth: null,
-    createdAt: new Date("2025-12-03T11:15:00"),
-  },
-  {
-    id: "3",
-    symbol: "MSFT",
-    status: "completed",
-    impliedGrowth: 12,
-    aiPredictedGrowth: 15, // Gap: -3% → Undervalued (Green)
-    createdAt: new Date("2025-12-02T14:20:00"),
-  },
-  {
-    id: "4",
-    symbol: "TSLA",
-    status: "failed",
-    impliedGrowth: null,
-    aiPredictedGrowth: null,
-    createdAt: new Date("2025-12-02T09:45:00"),
-  },
-  {
-    id: "5",
-    symbol: "NVDA",
-    status: "completed",
-    impliedGrowth: 25,
-    aiPredictedGrowth: 12, // Gap: +13% → Overvalued (Red)
-    createdAt: new Date("2025-12-01T16:30:00"),
-  },
-];
+type AnalysisStatus = "completed" | "processing" | "failed";
 
-type AnalysisStatus = "completed" | "processing" | "failed" | "pending";
-
-interface Analysis {
+interface QueryWithResult {
   id: string;
   symbol: string;
   status: string;
-  impliedGrowth: number | null;
-  aiPredictedGrowth: number | null;
+  traceId: string | null;
   createdAt: Date;
+  analysisResult: {
+    id: string;
+    price: number;
+    dcf: PackedAnalysisData["dcf"];
+  } | null;
 }
 
 function StatusBadge({ status }: { status: AnalysisStatus }) {
@@ -104,11 +75,6 @@ function StatusBadge({ status }: { status: AnalysisStatus }) {
       className: "bg-red-500 hover:bg-red-600 text-white",
       label: "Failed",
     },
-    pending: {
-      icon: Clock,
-      className: "bg-yellow-500 hover:bg-yellow-600 text-white",
-      label: "Pending",
-    },
   };
 
   const variant = variants[status];
@@ -116,20 +82,33 @@ function StatusBadge({ status }: { status: AnalysisStatus }) {
 
   return (
     <Badge className={variant.className}>
-      <Icon className="h-3 w-3 mr-1" />
+      <Icon
+        className={`h-3 w-3 mr-1 ${status === "processing" ? "animate-spin" : ""}`}
+      />
       {variant.label}
     </Badge>
   );
 }
 
 function PriceLegitimacyBadge({
-  impliedGrowth,
-  aiPredictedGrowth,
+  analysisResult,
 }: {
-  impliedGrowth: number | null;
-  aiPredictedGrowth: number | null;
+  analysisResult: QueryWithResult["analysisResult"];
 }) {
-  if (impliedGrowth === null || aiPredictedGrowth === null) {
+  if (!analysisResult?.dcf) {
+    return <span className="text-slate-400">—</span>;
+  }
+
+  const dcf = analysisResult.dcf;
+  const impliedGrowth = dcf.scenarios?.[0]?.impliedGrowth;
+  const aiPredictedGrowth = dcf.independentPrediction?.predictedCagr;
+
+  if (
+    impliedGrowth === null ||
+    impliedGrowth === undefined ||
+    aiPredictedGrowth === null ||
+    aiPredictedGrowth === undefined
+  ) {
     return <span className="text-slate-400">—</span>;
   }
 
@@ -183,7 +162,7 @@ function StatCard({
 
 function formatDate(date: Date) {
   const now = new Date();
-  const diffMs = now.getTime() - date.getTime();
+  const diffMs = now.getTime() - new Date(date).getTime();
   const diffMins = Math.floor(diffMs / 60000);
   const diffHours = Math.floor(diffMs / 3600000);
   const diffDays = Math.floor(diffMs / 86400000);
@@ -195,7 +174,7 @@ function formatDate(date: Date) {
   } else if (diffDays === 1) {
     return "Yesterday";
   } else {
-    return date.toLocaleDateString("en-US", {
+    return new Date(date).toLocaleDateString("en-US", {
       month: "short",
       day: "numeric",
       year: "numeric",
@@ -204,11 +183,110 @@ function formatDate(date: Date) {
 }
 
 export default function DashboardPage() {
-  // TODO: Fetch actual data from backend
-  // const response = await fetch('http://localhost:3001/api/history');
-  // const analyses = await response.json();
+  const [queries, setQueries] = useState<QueryWithResult[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const analyses = mockAnalyses;
+  // Subscribe to stream events
+  const { data: streamData = [] } = useStreamGroup<{
+    id: string;
+    symbol: string;
+    status: string;
+  }>({
+    streamName: "stock-analysis-stream",
+    groupId: "analysis",
+  });
+
+  // Fetch initial data
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const data = await getUserQueryHistory();
+        setQueries(data as QueryWithResult[]);
+
+        // Sync processing queries
+        const processingQueries = data.filter((q) => q.status === "processing");
+        for (const query of processingQueries) {
+          await syncQueryStatus(query.id);
+        }
+
+        // Refresh data after sync
+        if (processingQueries.length > 0) {
+          const refreshedData = await getUserQueryHistory();
+          setQueries(refreshedData as QueryWithResult[]);
+        }
+      } catch (error) {
+        console.error("Failed to fetch queries:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
+  }, []);
+
+  // Update status based on stream events
+  useEffect(() => {
+    if (streamData.length === 0 || queries.length === 0) return;
+
+    // Use a flag to track if we need to refresh
+    let needsRefresh = false;
+
+    const updateQueries = async () => {
+      for (const query of queries) {
+        if (!query.traceId) continue;
+
+        const event = streamData.find((item) => item.id === query.traceId);
+        if (!event) continue;
+
+        // Check if stream indicates completion
+        if (event.status === "Analysis completed") {
+          await syncQueryStatus(query.id);
+          needsRefresh = true;
+        }
+
+        // Check if stream indicates failure
+        if (
+          event.status.toLowerCase().includes("error") ||
+          event.status.toLowerCase().includes("failed")
+        ) {
+          await markQueryAsFailed(query.id);
+          needsRefresh = true;
+        }
+      }
+
+      // Refresh data if any status changed
+      if (needsRefresh) {
+        const refreshedData = await getUserQueryHistory();
+        setQueries(refreshedData as QueryWithResult[]);
+      }
+    };
+
+    updateQueries();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [streamData]);
+
+  const handleRetry = async (symbol: string) => {
+    try {
+      await triggerAnalysis(symbol);
+      // Refresh the list
+      const data = await getUserQueryHistory();
+      setQueries(data as QueryWithResult[]);
+    } catch (error) {
+      console.error("Failed to retry analysis:", error);
+    }
+  };
+
+  if (loading) {
+    return (
+      <section className="container mx-auto px-4 py-16">
+        <div className="max-w-6xl mx-auto">
+          <div className="flex items-center justify-center min-h-[400px]">
+            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          </div>
+        </div>
+      </section>
+    );
+  }
 
   return (
     <section className="container mx-auto px-4 py-16">
@@ -225,20 +303,20 @@ export default function DashboardPage() {
 
         {/* Stats Cards */}
         <div className="grid md:grid-cols-4 gap-4">
-          <StatCard title="Total Analyses" value={analyses.length} />
+          <StatCard title="Total Analyses" value={queries.length} />
           <StatCard
             title="Completed"
-            value={analyses.filter((a) => a.status === "completed").length}
+            value={queries.filter((q) => q.status === "completed").length}
             className="text-green-600"
           />
           <StatCard
             title="Processing"
-            value={analyses.filter((a) => a.status === "processing").length}
+            value={queries.filter((q) => q.status === "processing").length}
             className="text-blue-600"
           />
           <StatCard
             title="Failed"
-            value={analyses.filter((a) => a.status === "failed").length}
+            value={queries.filter((q) => q.status === "failed").length}
             className="text-red-600"
           />
         </div>
@@ -252,7 +330,7 @@ export default function DashboardPage() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            {analyses.length === 0 ? (
+            {queries.length === 0 ? (
               <div className="text-center py-12">
                 <p className="text-slate-600 dark:text-slate-400 mb-4">
                   No analyses yet. Start by searching for a stock symbol above.
@@ -270,44 +348,44 @@ export default function DashboardPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {analyses.map((analysis) => (
-                    <TableRow key={analysis.id}>
+                  {queries.map((query) => (
+                    <TableRow key={query.id}>
                       <TableCell className="font-semibold">
-                        {analysis.symbol}
+                        {query.symbol}
                       </TableCell>
                       <TableCell>
-                        <StatusBadge
-                          status={analysis.status as AnalysisStatus}
-                        />
+                        <StatusBadge status={query.status as AnalysisStatus} />
                       </TableCell>
                       <TableCell className="text-slate-600 dark:text-slate-400">
-                        {formatDate(analysis.createdAt)}
+                        {formatDate(query.createdAt)}
                       </TableCell>
                       <TableCell>
                         <PriceLegitimacyBadge
-                          impliedGrowth={analysis.impliedGrowth}
-                          aiPredictedGrowth={analysis.aiPredictedGrowth}
+                          analysisResult={query.analysisResult}
                         />
                       </TableCell>
                       <TableCell className="text-right">
-                        {analysis.status === "completed" ? (
-                          <Link href={`/analysis/${analysis.symbol}`}>
+                        {query.status === "completed" ? (
+                          <Link href={`/analysis/${query.symbol}`}>
                             <Button variant="ghost" size="sm">
                               <Eye className="h-4 w-4 mr-2" />
                               View
                             </Button>
                           </Link>
-                        ) : analysis.status === "processing" ? (
+                        ) : query.status === "processing" ? (
                           <Button variant="ghost" size="sm" disabled>
                             <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                             Processing
                           </Button>
                         ) : (
-                          <Link href={`/analysis/${analysis.symbol}`}>
-                            <Button variant="ghost" size="sm">
-                              Retry
-                            </Button>
-                          </Link>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleRetry(query.symbol)}
+                          >
+                            <RefreshCw className="h-4 w-4 mr-2" />
+                            Retry
+                          </Button>
                         )}
                       </TableCell>
                     </TableRow>

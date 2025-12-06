@@ -69,10 +69,18 @@ model UserQuery {
 
   symbol String
 
-  analysisResultId String
-  analysisResult   AnalysisResult @relation(fields: [analysisResultId], references: [id])
+  // Status tracking
+  status  String  @default("processing") // "processing" | "completed" | "failed"
+  traceId String? // Link to backend trace for real-time updates
+
+  // Optional: will be set when analysis completes
+  analysisResultId String?
+  analysisResult   AnalysisResult? @relation(fields: [analysisResultId], references: [id])
 
   createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([traceId])
 }
 
 // NextAuth Standard Models...

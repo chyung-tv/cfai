@@ -93,6 +93,26 @@ export async function triggerAnalysis(ticker: string) {
     }
 
     const data = await response.json();
+
+    // Create UserQuery to track this request
+    console.log(
+      "[triggerAnalysis] Creating UserQuery for user:",
+      session.user.id,
+      "symbol:",
+      symbol
+    );
+    const userQuery = await prisma.userQuery.create({
+      data: {
+        user: {
+          connect: { id: session.user.id! },
+        },
+        symbol: symbol,
+        status: "processing",
+        traceId: data.traceId,
+      },
+    });
+    console.log("[triggerAnalysis] Created UserQuery:", userQuery.id);
+
     return { status: "processing", traceId: data.traceId };
   } catch (error) {
     console.error("Error triggering analysis:", error);
@@ -131,6 +151,26 @@ export async function forceRefreshAnalysis(ticker: string) {
     }
 
     const data = await response.json();
+
+    // Create UserQuery to track this request
+    console.log(
+      "[forceRefreshAnalysis] Creating UserQuery for user:",
+      session.user.id,
+      "symbol:",
+      symbol
+    );
+    const userQuery = await prisma.userQuery.create({
+      data: {
+        user: {
+          connect: { id: session.user.id! },
+        },
+        symbol: symbol,
+        status: "processing",
+        traceId: data.traceId,
+      },
+    });
+    console.log("[forceRefreshAnalysis] Created UserQuery:", userQuery.id);
+
     return { status: "processing", traceId: data.traceId };
   } catch (error) {
     console.error("Error triggering analysis:", error);
