@@ -2,6 +2,8 @@
 
 import prisma from "@repo/db";
 import type { PackedAnalysisData } from "@repo/types";
+import { auth, getUserAccess } from "@/lib/auth";
+import { redirect } from "next/navigation";
 
 const CACHE_VALIDITY_DAYS = 5;
 
@@ -41,6 +43,19 @@ export async function getAnalysis(
 }
 
 export async function triggerAnalysis(ticker: string) {
+  // Check authentication
+  const session = await auth();
+  if (!session?.user) {
+    redirect("/login");
+  }
+
+  // Check access permission
+  if (!getUserAccess(session)) {
+    throw new Error(
+      JSON.stringify({ code: "NO_ACCESS", message: "Beta access required" })
+    );
+  }
+
   const symbol = ticker.toUpperCase();
 
   // Check if we have a recent analysis (within CACHE_VALIDITY_DAYS)
@@ -64,6 +79,44 @@ export async function triggerAnalysis(ticker: string) {
   }
 
   // Call backend API
+  try {
+    const response = await fetch(
+      `http://localhost:3001/stock/search?symbol=${symbol}`,
+      {
+        method: "GET",
+        cache: "no-store",
+      }
+    );
+
+    if (!response.ok) {
+      throw new Error("Failed to trigger analysis");
+    }
+
+    const data = await response.json();
+    return { status: "processing", traceId: data.traceId };
+  } catch (error) {
+    console.error("Error triggering analysis:", error);
+    throw error;
+  }
+}
+
+export async function forceRefreshAnalysis(ticker: string) {
+  // Check authentication
+  const session = await auth();
+  if (!session?.user) {
+    redirect("/login");
+  }
+
+  // Check access permission
+  if (!getUserAccess(session)) {
+    throw new Error(
+      JSON.stringify({ code: "NO_ACCESS", message: "Beta access required" })
+    );
+  }
+
+  const symbol = ticker.toUpperCase();
+
+  // Always trigger a new analysis, regardless of cache
   try {
     const response = await fetch(
       `http://localhost:3001/stock/search?symbol=${symbol}`,

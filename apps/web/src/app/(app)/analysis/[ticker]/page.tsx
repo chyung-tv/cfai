@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Download, Share2 } from "lucide-react";
 import { getAnalysis } from "@/lib/actions/analysis";
+import { RefreshAnalysisButton } from "@/components/analysis/refresh-analysis-button";
 
 interface AnalysisPageProps {
   params: Promise<{ ticker: string }>;
@@ -69,6 +70,7 @@ export default async function AnalysisPage({ params }: AnalysisPageProps) {
               </Badge>
             </div>
             <div className="flex items-center gap-2">
+              {/* <RefreshAnalysisButton ticker={ticker} /> */}
               <Button variant="outline" size="sm">
                 <Share2 className="h-4 w-4 mr-2" />
                 Share
@@ -78,6 +80,12 @@ export default async function AnalysisPage({ params }: AnalysisPageProps) {
                 Export
               </Button>
             </div>
+          </div>
+          <div className="mt-3 px-1">
+            <p className="text-xs text-slate-500 dark:text-slate-400">
+              ℹ️ AI analysis is subjective and may produce different results on
+              each run. Re-run to get a fresh perspective.
+            </p>
           </div>
         </div>
       </div>

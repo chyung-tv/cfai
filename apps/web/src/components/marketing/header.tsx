@@ -1,5 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { TrendingUp } from "lucide-react";
+import Link from "next/link";
 
 export function Header() {
   return (
@@ -12,8 +13,12 @@ export function Header() {
           </span>
         </div>
         <div className="flex items-center gap-3">
-          <Button variant="ghost">Login</Button>
-          <Button>Sign Up</Button>
+          <Link href="/login">
+            <Button variant="ghost">Login</Button>
+          </Link>
+          <Link href="/login">
+            <Button>Sign Up</Button>
+          </Link>
         </div>
       </div>
     </header>

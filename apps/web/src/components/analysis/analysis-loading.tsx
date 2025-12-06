@@ -48,6 +48,18 @@ export function AnalysisLoading({ ticker }: AnalysisLoadingProps) {
           setTraceId(result.traceId);
         }
       } catch (err) {
+        // Check for NO_ACCESS error
+        if (err instanceof Error) {
+          try {
+            const errorData = JSON.parse(err.message);
+            if (errorData.code === "NO_ACCESS") {
+              router.push("/dashboard/no-access");
+              return;
+            }
+          } catch {
+            // Not a JSON error, continue with default error handling
+          }
+        }
         // Error will be reflected in stream status from backend
         console.error("Failed to start analysis:", err);
       }

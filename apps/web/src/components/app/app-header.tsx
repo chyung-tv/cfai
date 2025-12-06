@@ -2,10 +2,13 @@
 
 import { Button } from "@/components/ui/button";
 import { StockSearchBar } from "@/components/shared/stock-search-bar";
-import { TrendingUp, User } from "lucide-react";
+import { TrendingUp, User, LogOut } from "lucide-react";
 import Link from "next/link";
+import { useSession, signOut } from "next-auth/react";
 
 export function AppHeader() {
+  const { data: session } = useSession();
+
   return (
     <header className="border-b bg-white/80 dark:bg-slate-950/80 backdrop-blur-sm sticky top-0 z-50">
       <div className="container mx-auto px-4 py-4">
@@ -30,10 +33,29 @@ export function AppHeader() {
                 Dashboard
               </Button>
             </Link>
-            <Button variant="ghost" size="sm">
-              <User className="h-4 w-4 mr-2" />
-              Profile
-            </Button>
+            {session?.user ? (
+              <>
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <User className="h-4 w-4" />
+                  <span>{session.user.name || session.user.email}</span>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => signOut({ callbackUrl: "/" })}
+                >
+                  <LogOut className="h-4 w-4 mr-2" />
+                  Sign Out
+                </Button>
+              </>
+            ) : (
+              <Link href="/login">
+                <Button variant="ghost" size="sm">
+                  <User className="h-4 w-4 mr-2" />
+                  Sign In
+                </Button>
+              </Link>
+            )}
           </nav>
         </div>
       </div>
