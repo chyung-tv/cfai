@@ -25,16 +25,11 @@ export function AnalysisLoading({ ticker }: AnalysisLoadingProps) {
     groupId: "analysis",
   });
 
-  console.log("Stream data:", streamData);
-  console.log("TraceId:", traceId);
-
   // Derive everything from stream data
   const relevantEvent =
     traceId && streamData.length > 0
       ? streamData.find((item) => item.id === traceId)
       : null;
-
-  console.log("Relevant event:", relevantEvent);
 
   const statusMessage = relevantEvent?.status || "Initializing analysis...";
   const isError =

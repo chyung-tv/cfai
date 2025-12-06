@@ -3,6 +3,8 @@
 import prisma from "@repo/db";
 import type { PackedAnalysisData } from "@repo/types";
 
+const CACHE_VALIDITY_DAYS = 5;
+
 export async function getAnalysis(
   ticker: string
 ): Promise<PackedAnalysisData | null> {
@@ -17,15 +19,31 @@ export async function getAnalysis(
     },
   });
 
-  // Cast to PackedAnalysisData (JSON fields are validated by Zod in backend)
-  return analysis as PackedAnalysisData | null;
+  if (!analysis) {
+    return null;
+  }
+
+  // Check if analysis is stale (older than CACHE_VALIDITY_DAYS)
+  const ageInDays =
+    (Date.now() - new Date(analysis.createdAt).getTime()) /
+    (1000 * 60 * 60 * 24);
+
+  if (ageInDays > CACHE_VALIDITY_DAYS) {
+    // Cache miss: trigger new analysis in background and return null
+    triggerAnalysis(ticker).catch((error) => {
+      console.error("Failed to trigger background analysis:", error);
+    });
+    return null;
+  }
+
+  // Cache hit: return fresh data
+  return analysis as unknown as PackedAnalysisData;
 }
 
 export async function triggerAnalysis(ticker: string) {
   const symbol = ticker.toUpperCase();
 
-  // Check if we have a recent analysis (e.g., within 24 hours)
-  // For now, we just check if it exists to avoid re-running
+  // Check if we have a recent analysis (within CACHE_VALIDITY_DAYS)
   const existing = await prisma.analysisResult.findFirst({
     where: {
       symbol: symbol,
@@ -36,7 +54,13 @@ export async function triggerAnalysis(ticker: string) {
   });
 
   if (existing) {
-    return { status: "completed", traceId: existing.id };
+    const ageInDays =
+      (Date.now() - new Date(existing.createdAt).getTime()) /
+      (1000 * 60 * 60 * 24);
+
+    if (ageInDays <= CACHE_VALIDITY_DAYS) {
+      return { status: "completed", traceId: existing.id };
+    }
   }
 
   // Call backend API

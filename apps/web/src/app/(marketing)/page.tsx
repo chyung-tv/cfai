@@ -49,13 +49,20 @@ export default function Home() {
     },
   ];
 
-  // Function to calculate share price based on growth and discount rate
-  const calculatePrice = (growth: number, discount: number) => {
-    // Simplified mock calculation
-    const base = 100;
-    const factor = (1 + growth / 100) / (discount / 100);
-    return Math.round(base * factor);
+  // Mock DCF sensitivity data for demo
+  const mockSensitivity = {
+    terminalGrowthRates: [0.025, 0.0275, 0.03, 0.0325, 0.035],
+    discountRates: [0.08, 0.085, 0.09, 0.095, 0.1],
+    values: [
+      [197.74, 204.13, 211.16, 218.93, 227.56],
+      [180.06, 185.19, 190.78, 196.91, 203.65],
+      [165.12, 169.3, 173.83, 178.75, 184.12],
+      [152.34, 155.79, 159.51, 163.52, 167.86],
+      [141.29, 144.17, 147.25, 150.56, 154.13],
+    ],
   };
+
+  const usedDiscountRate = 0.09; // Base case is 9%
 
   return (
     <div className="min-h-screen bg-linear-to-br from-slate-50 via-blue-50 to-indigo-50 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950">
@@ -70,7 +77,7 @@ export default function Home() {
               What You Get
             </h2>
             <p className="text-slate-600 dark:text-slate-400">
-              A comprehensive analysis of AAPL (Example)
+              A comprehensive analysis of AAPL (Demo Data)
             </p>
           </div>
 
@@ -102,7 +109,8 @@ export default function Home() {
           {/* Row 3: Sensitivity */}
           <SensitivityTable
             currentPrice={currentPrice}
-            calculatePrice={calculatePrice}
+            sensitivity={mockSensitivity}
+            usedDiscountRate={usedDiscountRate}
           />
         </div>
       </section>

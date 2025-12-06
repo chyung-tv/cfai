@@ -54,13 +54,6 @@ export default async function AnalysisPage({ params }: AnalysisPageProps) {
   const feasibilityScenarios = dcf.scenarios || [];
   const independentPrediction = dcf.independentPrediction?.predictedCagr || 0;
 
-  // Price calculation function for sensitivity table
-  const calculatePrice = (growth: number, discount: number) => {
-    const base = 100;
-    const factor = (1 + growth / 100) / (discount / 100);
-    return Math.round(base * factor);
-  };
-
   return (
     <>
       {/* Page Header */}
@@ -137,7 +130,8 @@ export default async function AnalysisPage({ params }: AnalysisPageProps) {
           {/* Row 4: Sensitivity */}
           <SensitivityTable
             currentPrice={currentPrice}
-            calculatePrice={calculatePrice}
+            sensitivity={dcf.sensitivity}
+            usedDiscountRate={dcf.usedDiscountRate}
           />
         </div>
       </section>
