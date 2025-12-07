@@ -2,72 +2,189 @@
 
 ## 1. Project Architecture & Context
 
-- **Monorepo Structure**: Turborepo with two distinct services sharing a database.
-  - `apps/backend`: **Motia** framework (Event-driven analysis engine). Port 3001.
-  - `apps/web`: **Next.js 16** frontend (UI, Auth, Dashboard). Port 3000.
-  - `packages/db`: Shared **Prisma** schema and client.
-- **Service Boundaries**:
-  - Backend and Web are **independent**. They communicate via HTTP APIs and shared DB access.
-  - **Never** import backend code directly into the web app or vice versa. Use shared packages.
+**Monorepo Structure**: Turborepo with two independent services sharing a database:
+
+- `apps/backend`: **Motia** event-driven analysis engine (port 3001)
+- `apps/web`: **Next.js 15** frontend with NextAuth (port 3000)
+- `packages/db`: Shared Prisma schema and client
+- `packages/types`: Shared Zod schemas exported by both services
+
+**Service Boundaries**: Backend and web communicate via HTTP APIs, real-time streams, and shared database access. Never import backend code into web or vice versa—use shared packages (`@repo/types`, `@repo/db`).
 
 ## 2. Backend Development (Motia Framework)
 
-- **Core Primitive**: The **Step** (`*.step.ts`).
-  - **API Steps**: Handle HTTP requests (e.g., `stock-analysis-api.step.ts`).
-  - **Event Steps**: Handle background logic (e.g., `dcf.step.ts`, `rating.step.ts`).
-  - **Cron Steps**: Handle scheduled tasks.
-- **Event-Driven Flow**:
-  - Steps emit events to trigger downstream steps: `await emit({ topic: "next-step", data: { symbol } })`.
-  - **Pattern**: API -> Event -> Event -> ... -> DB/Stream.
-- **State Management**:
-  - **Write**: `await state.set("key", traceId, data)`.
-  - **Read**: **ALWAYS** use `getValidatedState("key", schema, state, traceId, logger)` from `steps/lib/statehooks.ts`.
-  - **Why**: Ensures type safety and runtime validation between decoupled steps.
-- **Type Safety**:
-  - **Crucial**: Run `npx motia generate-types` in `apps/backend` after ANY change to step config (inputs/emits).
-  - **Zod**: Every step **must** export its output schema (e.g., `export const dcfResultSchema = z.object(...)`).
+**Core Primitive**: The **Step** (`*.step.ts`). Each step exports `config` (type, schemas, emits) and `handler` (async function).
 
-## 3. Frontend Development (Next.js 16)
+**Step Types**:
 
-- **Component Architecture**:
-  - **Analysis Pillars**:
-    1.  **Business Quality**: `BusinessQualityCard` (Moat, Tier, Structure).
-    2.  **Valuation Reality**: `FeasibilityGauge` (Price vs. Growth Math).
-    3.  **Action**: `AllocationCard` (Buy/Sell, Role, Risk).
-    4.  **Sensitivity**: `SensitivityTable` (Valuation Matrix).
-- **Data Fetching**:
-  - Currently using mock data in `page.tsx`.
-  - Future state: Connect to `stock-analysis-stream` for real-time updates.
-- **Styling**: Tailwind CSS 4. Use `lucide-react` for icons.
+- **API Steps**: HTTP endpoints (`stock-analysis-api.step.ts` → emits event → returns immediately)
+- **Event Steps**: Background processing (`dcf.step.ts`, `judgement.step.ts` → heavy AI/compute work)
+- **Cron Steps**: Scheduled tasks
+- **Stream Steps**: Real-time WebSocket updates (`.stream.ts`)
+
+**Event-Driven Flow Pattern**:
+
+```typescript
+// API Step emits event immediately
+await emit({ topic: "process-stock-analysis", data: { symbol } });
+
+// Event step subscribes to topic
+subscribes: ["process-stock-analysis"];
+```
+
+**State Management** (Critical):
+
+- **Write**: `await state.set("key", traceId, data)`
+- **Read**: **ALWAYS** use `getValidatedState("key", schema, state, traceId, logger)` from `steps/lib/statehooks.ts`
+- **Why**: Validates type safety and runtime correctness between decoupled steps
+
+**Real-Time Streams**:
+
+- Update clients via `streams["stock-analysis-stream"].set("analysis", traceId, { status: "..." })`
+- Clients auto-receive updates via WebSocket (see `.github/motia-stream.md`)
+
+**Type Generation** (Non-Negotiable):
+
+- Run `npx motia generate-types` in `apps/backend` after ANY config change
+- Auto-generates `types.d.ts` with type-safe `Handlers` interface
+- Every step MUST export its Zod schema to `packages/types`
+
+## 3. Frontend Development (Next.js 15)
+
+**Component Architecture** (Four Analysis Pillars):
+
+1. **Business Quality**: `BusinessQualityCard` → Moat, Tier, Market Structure
+2. **Valuation Reality**: `FeasibilityGauge` → Price vs. Growth Feasibility (5 scenarios)
+3. **Action**: `AllocationCard` → Buy/Hold/Sell, Portfolio Role, Risk
+4. **Sensitivity**: `SensitivityTable` → DCF matrix (discount rate × terminal growth)
+
+**Data Flow**:
+
+- Current: Mock data in `(marketing)/page.tsx`
+- Future: Connect to `stock-analysis-stream` for real-time updates via `@motiadev/stream-client-react`
+
+**Styling**: Tailwind CSS with `lucide-react` icons
 
 ## 4. AI & Financial Logic
 
-- **AI Provider**: Vercel AI SDK (`@ai-sdk/google`) with Gemini models (e.g., `gemini-2.5-flash`).
-- **Pattern**: Use `generateObject` with strict Zod schemas for all AI outputs.
-- **Key Schemas**:
-  - `growthJudgementSchema`: AI's independent growth prediction vs. market implied growth.
-  - `ratingSchema`: Comprehensive qualitative rating (Tier, Moat, Action).
-  - `dcfResultSchema`: Financial model outputs including sensitivity matrix.
-- **Financial Models**:
-  - **Reverse DCF**: Calculates implied growth from current price.
-  - **Forward DCF**: Calculates intrinsic value from AI projections.
+**AI Provider**: Vercel AI SDK (`@ai-sdk/google`) with Gemini models (`gemini-2.0-flash-exp`)
 
-## 5. Critical Workflows & Commands
+**Pattern**: Always use `generateObject` with strict Zod schemas:
 
-- **Start All**: `pnpm dev` (Root).
-- **Backend Dev**: `cd apps/backend && pnpm dev` (Runs Motia Workbench at localhost:3001).
-- **Type Gen**: `cd apps/backend && npx motia generate-types` (Run frequently!).
-- **DB Migration**: `cd packages/db && npx prisma migrate dev`.
-- **Studio**: `cd packages/db && npx prisma studio`.
+```typescript
+const result = await generateObject({
+  model: google("gemini-2.0-flash-exp"),
+  schema: growthJudgementSchema,
+  prompt: "...",
+});
+```
 
-## 6. Detailed Guides & Rules
+**Key AI Functions** (in `apps/backend/steps/lib/ai-functions/`):
 
-- **Motia Patterns**: Refer to `.cursor/rules/motia/` for authoritative guides on API, Event, and Cron steps.
-- **Architecture**: See `.cursor/architecture/` for project structure and error handling.
+- `parseThesis.ts`: Extract Porter's 5 Forces, growth drivers from research
+- `judgement.ts`: AI predicts realistic growth vs. market-implied growth
+- `rating.ts`: Comprehensive qualitative rating (Tier, Moat, Action)
 
-## 7. Common Pitfalls to Avoid
+**Financial Models**:
 
-- **Missing Types**: If you see `@ts-expect-error` in backend steps, run `generate-types`.
-- **Direct State Access**: Never use `state.get()` directly for complex objects; use `getValidatedState`.
-- **Overlapping UI**: Keep "Quality" (Verdict) separate from "Valuation" (Gauge). A good company can be overvalued.
-- **API/Event Confusion**: Don't do heavy processing in API steps. Emit an event and process in the background.
+- **Reverse DCF**: Solves for implied growth rate given current price
+- **Forward DCF**: Calculates intrinsic value from AI's growth projection
+- **Sensitivity Analysis**: 5×5 matrix (discount rate ±1% × terminal growth ±0.5%)
+
+## 5. Database Schema (Prisma)
+
+**Key Models**:
+
+- `User`: NextAuth user with `hasAccess` boolean (closed beta flag)
+- `AnalysisResult`: Cached stock analysis (1 per ticker per TTL), stores JSON blobs (`thesis`, `dcf`, `rating`)
+- `UserQuery`: Tracks user requests with `traceId` for real-time updates
+
+**Access Pattern**: Backend writes via `@repo/db`, frontend reads via server actions/API routes.
+
+## 6. Critical Workflows & Commands
+
+```bash
+# Start everything
+pnpm dev                          # Root (runs both backend + web)
+
+# Backend only
+cd apps/backend
+pnpm dev                          # Starts Motia Workbench at :3001
+npx motia generate-types          # Regenerate types after config changes
+
+# Database
+cd packages/db
+npx prisma migrate dev            # Create migration
+npx prisma studio                 # Visual DB browser
+
+# Type checking
+pnpm run check-types              # Validates all workspace types
+```
+
+## 7. Critical Patterns & Conventions
+
+**Shared Types**:
+
+- Always export schemas from `packages/types/src/*.ts`
+- Import as `import { dcfResultSchema } from "@repo/types"`
+- Maintain single source of truth for types
+
+**State Validation**:
+
+- Never use `state.get()` directly—use `getValidatedState()` to catch schema drift
+- Example: `const dcf = await getValidatedState("dcf", dcfResultSchema, state, traceId, logger)`
+
+**Event Chaining**:
+
+- List all emits in step config: `emits: ["finish-dcf"]`
+- Downstream steps subscribe: `subscribes: ["finish-dcf"]`
+- Check `.cursor/rules/motia/event-steps.mdc` for patterns
+
+**Real-Time Updates**:
+
+- Stream status updates at each step boundary for UX feedback
+- Pattern: `streams["stock-analysis-stream"].set("analysis", traceId, { status: "Calculating DCF..." })`
+
+## 8. Deployment Architecture
+
+**⚠️ Critical**: Frontend and backend **MUST** be deployed separately.
+
+**Why Separate Deployments:**
+
+- Motia requires persistent WebSocket connections (streams) and long-running BullMQ workers
+- Vercel serverless functions timeout after 60-300s (incompatible with Motia)
+- Backend needs Redis for state management and job queuing
+
+**Recommended Setup:**
+
+```
+Frontend (apps/web)    → Vercel (Next.js serverless)
+Backend (apps/backend) → Motia Cloud (managed Motia hosting)
+Database               → Vercel Postgres (shared)
+```
+
+**Alternative (Self-Hosted):**
+
+```
+Frontend (apps/web)    → Vercel
+Backend (apps/backend) → Railway/Render (Docker + Redis)
+Database               → Vercel Postgres
+```
+
+**Environment Variables:**
+
+- Vercel manages env vars via dashboard UI (no `.env` files in deployment)
+- See `.env.example` for all required variables
+- `turbo.json` configured with `env` arrays for proper cache invalidation
+- Different `NEXTAUTH_SECRET` for staging vs production
+
+**Detailed Guide**: See `.github/DEPLOYMENT.md` for step-by-step deployment instructions.
+
+## 9. Common Pitfalls
+
+- **Missing Types**: If you see TypeScript errors in handlers, run `npx motia generate-types`
+- **Direct State Access**: Using `state.get()` without validation causes silent type mismatches
+- **Heavy API Logic**: API steps should emit events, not perform compute (use Event steps)
+- **Schema Drift**: Always re-export schemas from `packages/types` to keep frontend/backend in sync
+- **Overlapping Concerns**: Keep "Quality" (business strength) separate from "Valuation" (price vs. growth math)
+- **Deploying Backend to Vercel**: Will fail silently or timeout—use Docker/Railway instead
