@@ -7,6 +7,12 @@ import { redirect } from "next/navigation";
 
 const CACHE_VALIDITY_DAYS = 5;
 
+// Backend API URL
+// Local: http://localhost:3001
+// Production: https://your-project.motia.cloud (from Motia Cloud dashboard)
+const BACKEND_API_URL =
+  process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:3001";
+
 export async function getAnalysis(
   ticker: string
 ): Promise<PackedAnalysisData | null> {
@@ -81,7 +87,7 @@ export async function triggerAnalysis(ticker: string) {
   // Call backend API
   try {
     const response = await fetch(
-      `http://localhost:3001/stock/search?symbol=${symbol}`,
+      `${BACKEND_API_URL}/stock/search?symbol=${symbol}`,
       {
         method: "GET",
         cache: "no-store",
@@ -139,7 +145,7 @@ export async function forceRefreshAnalysis(ticker: string) {
   // Always trigger a new analysis, regardless of cache
   try {
     const response = await fetch(
-      `http://localhost:3001/stock/search?symbol=${symbol}`,
+      `${BACKEND_API_URL}/stock/search?symbol=${symbol}`,
       {
         method: "GET",
         cache: "no-store",
