@@ -318,8 +318,8 @@ export default function DashboardPage() {
                   Beta Access Required
                 </p>
                 <p className="text-sm text-amber-700 dark:text-amber-300">
-                  You can view existing analyses, but new analysis requests require beta access.
-                  Contact{" "}
+                  You can view existing analyses, but new analysis requests
+                  require beta access. Contact{" "}
                   <a
                     href="mailto:beta@cfai.com"
                     className="underline hover:text-amber-900 dark:hover:text-amber-100"

@@ -27,12 +27,12 @@ export default async function AnalysisPage({ params }: AnalysisPageProps) {
   if (!analysisData) {
     const session = await auth();
     const hasAccess = getUserAccess(session);
-    
+
     // No cache hit + no access = redirect to no-access page
     if (!hasAccess) {
       redirect("/dashboard/no-access");
     }
-    
+
     // Has access, show loading component which will trigger analysis
     return (
       <>

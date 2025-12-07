@@ -84,6 +84,28 @@ export async function triggerAnalysis(ticker: string) {
     }
   }
 
+  // Check if there's already a processing request for this symbol (deduplication)
+  const processingQuery = await prisma.userQuery.findFirst({
+    where: {
+      symbol: symbol,
+      status: "processing",
+    },
+    orderBy: {
+      createdAt: "desc",
+    },
+  });
+
+  if (processingQuery && processingQuery.traceId) {
+    console.log(
+      "[triggerAnalysis] Found existing processing query for symbol:",
+      symbol,
+      "traceId:",
+      processingQuery.traceId
+    );
+    // Return the existing trace ID so client can subscribe to its updates
+    return { status: "processing", traceId: processingQuery.traceId };
+  }
+
   // Call backend API
   try {
     const response = await fetch(
