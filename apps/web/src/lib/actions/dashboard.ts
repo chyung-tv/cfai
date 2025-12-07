@@ -1,8 +1,16 @@
 "use server";
 
 import prisma from "@repo/db";
-import { auth } from "@/lib/auth";
+import { auth, getUserAccess } from "@/lib/auth";
 import { redirect } from "next/navigation";
+
+export async function checkUserAccess(): Promise<boolean> {
+  const session = await auth();
+  if (!session?.user) {
+    return false;
+  }
+  return getUserAccess(session);
+}
 
 export async function getUserQueryHistory() {
   const session = await auth();

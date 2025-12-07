@@ -9,6 +9,8 @@ import { Button } from "@/components/ui/button";
 import { Download, Share2 } from "lucide-react";
 import { getAnalysis } from "@/lib/actions/analysis";
 import { RefreshAnalysisButton } from "@/components/analysis/refresh-analysis-button";
+import { auth, getUserAccess } from "@/lib/auth";
+import { redirect } from "next/navigation";
 
 interface AnalysisPageProps {
   params: Promise<{ ticker: string }>;
@@ -21,8 +23,17 @@ export default async function AnalysisPage({ params }: AnalysisPageProps) {
   // Fetch actual analysis data from database
   const analysisData = await getAnalysis(ticker);
 
-  // If no data exists, show loading component which will trigger analysis
+  // If no data exists, check access before triggering analysis
   if (!analysisData) {
+    const session = await auth();
+    const hasAccess = getUserAccess(session);
+    
+    // No cache hit + no access = redirect to no-access page
+    if (!hasAccess) {
+      redirect("/dashboard/no-access");
+    }
+    
+    // Has access, show loading component which will trigger analysis
     return (
       <>
         <div className="border-b bg-white/80 dark:bg-slate-950/80 backdrop-blur-sm">
@@ -46,6 +57,7 @@ export default async function AnalysisPage({ params }: AnalysisPageProps) {
     );
   }
 
+  // Cache hit - show analysis to everyone (even no-access users)
   // Extract data from analysis result
   const currentPrice = analysisData.price;
   const thesis = analysisData.thesis;

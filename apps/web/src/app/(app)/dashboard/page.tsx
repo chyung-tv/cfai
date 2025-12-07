@@ -28,6 +28,7 @@ import {
   TrendingUp,
   Minus,
   RefreshCw,
+  AlertTriangle,
 } from "lucide-react";
 import Link from "next/link";
 import {
@@ -39,6 +40,7 @@ import {
   getUserQueryHistory,
   syncQueryStatus,
   markQueryAsFailed,
+  checkUserAccess,
 } from "@/lib/actions/dashboard";
 import { triggerAnalysis } from "@/lib/actions/analysis";
 import { useStreamGroup } from "@motiadev/stream-client-react";
@@ -185,6 +187,7 @@ function formatDate(date: Date) {
 export default function DashboardPage() {
   const [queries, setQueries] = useState<QueryWithResult[]>([]);
   const [loading, setLoading] = useState(true);
+  const [hasAccess, setHasAccess] = useState(true);
 
   // Subscribe to stream events
   const { data: streamData = [] } = useStreamGroup<{
@@ -200,6 +203,10 @@ export default function DashboardPage() {
   useEffect(() => {
     const fetchData = async () => {
       try {
+        // Check user access
+        const access = await checkUserAccess();
+        setHasAccess(access);
+
         const data = await getUserQueryHistory();
         setQueries(data as QueryWithResult[]);
 
@@ -300,6 +307,31 @@ export default function DashboardPage() {
             View and manage your stock analysis history
           </p>
         </div>
+
+        {/* No Access Banner */}
+        {!hasAccess && (
+          <div className="rounded-lg border border-amber-200 bg-amber-50 dark:bg-amber-950/20 dark:border-amber-800 p-4">
+            <div className="flex items-start gap-3">
+              <AlertTriangle className="h-5 w-5 text-amber-600 dark:text-amber-500 mt-0.5 shrink-0" />
+              <div className="space-y-1">
+                <p className="font-medium text-amber-800 dark:text-amber-200">
+                  Beta Access Required
+                </p>
+                <p className="text-sm text-amber-700 dark:text-amber-300">
+                  You can view existing analyses, but new analysis requests require beta access.
+                  Contact{" "}
+                  <a
+                    href="mailto:beta@cfai.com"
+                    className="underline hover:text-amber-900 dark:hover:text-amber-100"
+                  >
+                    beta@cfai.com
+                  </a>{" "}
+                  to request access.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Stats Cards */}
         <div className="grid md:grid-cols-4 gap-4">
