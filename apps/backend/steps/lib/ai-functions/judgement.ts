@@ -1,5 +1,5 @@
 import { generateObject } from "ai";
-import { google } from "./ai";
+import { deepseek, google } from "./ai";
 import { z } from "zod";
 import { qualitativeAnalysisSchema } from "../../stock-analysis/qualitative-analysis.step";
 import { reverseDcfAnalysisSchema } from "../../stock-analysis/reverse-dcf.step";

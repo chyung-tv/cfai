@@ -4,7 +4,7 @@ import { generateText } from "ai";
 
 export async function qualitativeStockAnalysis(symbol: string) {
   const { text, reasoning, providerMetadata } = await generateText({
-    model: google("gemini-2.5-pro"),
+    model: google("gemini-2.5-flash"),
     tools: {
       googleSearch: google.tools.googleSearch({}),
     },

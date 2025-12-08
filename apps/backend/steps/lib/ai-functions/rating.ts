@@ -3,7 +3,7 @@ import { DCFResult } from "../functions/dcf";
 import { GrowthJudgement } from "../../stock-analysis/judgement.step";
 import { generateObject } from "ai";
 import { z } from "zod";
-import { google } from "./ai";
+import { deepseek, google } from "./ai";
 import { ratingSchema, type StockRating } from "@repo/types";
 
 export { ratingSchema, type StockRating } from "@repo/types";
