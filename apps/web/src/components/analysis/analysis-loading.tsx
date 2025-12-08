@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { triggerAnalysis } from "@/lib/actions/analysis";
 import { Loader2, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { useStreamGroup } from "@motiadev/stream-client-react";
+import { useAnalysisStream } from "@/hooks/useAnalysisStream";
 
 interface AnalysisLoadingProps {
   ticker: string;
@@ -15,26 +15,8 @@ export function AnalysisLoading({ ticker }: AnalysisLoadingProps) {
   const router = useRouter();
   const [traceId, setTraceId] = useState<string | null>(null);
 
-  // Subscribe to stream events
-  const { data: streamData = [] } = useStreamGroup<{
-    id: string;
-    symbol: string;
-    status: string;
-  }>({
-    streamName: "stock-analysis-stream",
-    groupId: "analysis",
-  });
-
-  // Derive everything from stream data
-  const relevantEvent =
-    traceId && streamData.length > 0
-      ? streamData.find((item) => item.id === traceId)
-      : null;
-
-  const statusMessage = relevantEvent?.status || "Initializing analysis...";
-  const isError =
-    statusMessage.toLowerCase().includes("error") ||
-    statusMessage.toLowerCase().includes("failed");
+  // Subscribe to stream events using shared hook
+  const { status: statusMessage, isError } = useAnalysisStream({ traceId });
 
   // Trigger analysis on mount
   useEffect(() => {

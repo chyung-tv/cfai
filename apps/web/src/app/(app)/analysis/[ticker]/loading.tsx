@@ -1,10 +1,7 @@
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Loader2 } from "lucide-react";
 
-export default async function Loading() {
-  // Simulate streaming delay
-  await new Promise((resolve) => setTimeout(resolve, 1000));
-
+export default function Loading() {
   return (
     <div className="container mx-auto px-4 py-16">
       <div className="max-w-6xl mx-auto space-y-8">

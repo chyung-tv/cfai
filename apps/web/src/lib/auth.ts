@@ -1,7 +1,19 @@
-import NextAuth, { Session } from "next-auth";
+import NextAuth, { Session, DefaultSession } from "next-auth";
 import Google from "next-auth/providers/google";
 import { PrismaAdapter } from "@auth/prisma-adapter";
 import prisma from "@repo/db";
+
+// Extend NextAuth types to include hasAccess
+declare module "next-auth" {
+  interface User {
+    hasAccess?: boolean;
+  }
+  interface Session {
+    user: {
+      hasAccess?: boolean;
+    } & DefaultSession["user"];
+  }
+}
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
   adapter: PrismaAdapter(prisma),
@@ -23,8 +35,8 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           select: { hasAccess: true },
         });
 
-        // Add hasAccess to session user
-        (session.user as any).hasAccess = dbUser?.hasAccess ?? false;
+        // Add hasAccess to session user (now type-safe!)
+        session.user.hasAccess = dbUser?.hasAccess ?? false;
       }
       return session;
     },
@@ -41,5 +53,5 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
  */
 export function getUserAccess(session: Session | null): boolean {
   if (!session?.user) return false;
-  return (session.user as any).hasAccess === true;
+  return session.user.hasAccess === true;
 }

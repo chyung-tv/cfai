@@ -1,7 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import type { PackedAnalysisData } from "@repo/types";
+import { useEffect, useState, useMemo, useCallback } from "react";
+import type {
+  PackedAnalysisData,
+  AnalysisStatus,
+  UserQueryWithResult,
+} from "@repo/types";
 import {
   Card,
   CardContent,
@@ -43,23 +47,7 @@ import {
   checkUserAccess,
 } from "@/lib/actions/dashboard";
 import { triggerAnalysis } from "@/lib/actions/analysis";
-import { useStreamGroup } from "@motiadev/stream-client-react";
-
-type AnalysisStatus = "completed" | "processing" | "failed";
-
-interface QueryWithResult {
-  id: string;
-  symbol: string;
-  status: string;
-  traceId: string | null;
-  createdAt: Date;
-  analysisResult: {
-    id: string;
-    price: number;
-    dcf: PackedAnalysisData["dcf"];
-  } | null;
-}
-
+import { useAnalysisStream } from "@/hooks/useAnalysisStream";
 function StatusBadge({ status }: { status: AnalysisStatus }) {
   const variants = {
     completed: {
@@ -95,7 +83,7 @@ function StatusBadge({ status }: { status: AnalysisStatus }) {
 function PriceLegitimacyBadge({
   analysisResult,
 }: {
-  analysisResult: QueryWithResult["analysisResult"];
+  analysisResult: UserQueryWithResult["analysisResult"];
 }) {
   if (!analysisResult?.dcf) {
     return <span className="text-slate-400">—</span>;
@@ -185,19 +173,12 @@ function formatDate(date: Date) {
 }
 
 export default function DashboardPage() {
-  const [queries, setQueries] = useState<QueryWithResult[]>([]);
+  const [queries, setQueries] = useState<UserQueryWithResult[]>([]);
   const [loading, setLoading] = useState(true);
   const [hasAccess, setHasAccess] = useState(true);
 
-  // Subscribe to stream events
-  const { data: streamData = [] } = useStreamGroup<{
-    id: string;
-    symbol: string;
-    status: string;
-  }>({
-    streamName: "stock-analysis-stream",
-    groupId: "analysis",
-  });
+  // Subscribe to stream events using shared hook
+  const { allEvents: streamData } = useAnalysisStream();
 
   // Fetch initial data
   useEffect(() => {
@@ -208,18 +189,18 @@ export default function DashboardPage() {
         setHasAccess(access);
 
         const data = await getUserQueryHistory();
-        setQueries(data as QueryWithResult[]);
+        setQueries(data as UserQueryWithResult[]);
 
-        // Sync processing queries
+        // Sync processing queries in parallel
         const processingQueries = data.filter((q) => q.status === "processing");
-        for (const query of processingQueries) {
-          await syncQueryStatus(query.id);
-        }
-
-        // Refresh data after sync
         if (processingQueries.length > 0) {
+          await Promise.all(
+            processingQueries.map((query) => syncQueryStatus(query.id))
+          );
+
+          // Refresh data after sync
           const refreshedData = await getUserQueryHistory();
-          setQueries(refreshedData as QueryWithResult[]);
+          setQueries(refreshedData as UserQueryWithResult[]);
         }
       } catch (error) {
         console.error("Failed to fetch queries:", error);
@@ -264,7 +245,7 @@ export default function DashboardPage() {
       // Refresh data if any status changed
       if (needsRefresh) {
         const refreshedData = await getUserQueryHistory();
-        setQueries(refreshedData as QueryWithResult[]);
+        setQueries(refreshedData as UserQueryWithResult[]);
       }
     };
 
@@ -272,16 +253,27 @@ export default function DashboardPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [streamData]);
 
-  const handleRetry = async (symbol: string) => {
+  const handleRetry = useCallback(async (symbol: string) => {
     try {
       await triggerAnalysis(symbol);
       // Refresh the list
       const data = await getUserQueryHistory();
-      setQueries(data as QueryWithResult[]);
+      setQueries(data as UserQueryWithResult[]);
     } catch (error) {
       console.error("Failed to retry analysis:", error);
     }
-  };
+  }, []);
+
+  // Memoize stats calculations
+  const stats = useMemo(
+    () => ({
+      total: queries.length,
+      completed: queries.filter((q) => q.status === "completed").length,
+      processing: queries.filter((q) => q.status === "processing").length,
+      failed: queries.filter((q) => q.status === "failed").length,
+    }),
+    [queries]
+  );
 
   if (loading) {
     return (
@@ -335,20 +327,20 @@ export default function DashboardPage() {
 
         {/* Stats Cards */}
         <div className="grid md:grid-cols-4 gap-4">
-          <StatCard title="Total Analyses" value={queries.length} />
+          <StatCard title="Total Analyses" value={stats.total} />
           <StatCard
             title="Completed"
-            value={queries.filter((q) => q.status === "completed").length}
+            value={stats.completed}
             className="text-green-600"
           />
           <StatCard
             title="Processing"
-            value={queries.filter((q) => q.status === "processing").length}
+            value={stats.processing}
             className="text-blue-600"
           />
           <StatCard
             title="Failed"
-            value={queries.filter((q) => q.status === "failed").length}
+            value={stats.failed}
             className="text-red-600"
           />
         </div>

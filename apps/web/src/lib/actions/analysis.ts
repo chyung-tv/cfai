@@ -4,8 +4,18 @@ import prisma from "@repo/db";
 import type { PackedAnalysisData } from "@repo/types";
 import { auth, getUserAccess } from "@/lib/auth";
 import { redirect } from "next/navigation";
+import { z } from "zod";
+import { logger } from "@/lib/logger";
 
 const CACHE_VALIDITY_DAYS = 5;
+
+// Input validation schemas
+const tickerSchema = z
+  .string()
+  .min(1, "Ticker symbol is required")
+  .max(10, "Ticker symbol too long")
+  .regex(/^[A-Z0-9]+$/, "Ticker symbol must be uppercase letters/numbers only")
+  .transform((val) => val.toUpperCase());
 
 // Backend API URL
 // Local: http://localhost:3001
@@ -16,7 +26,8 @@ const BACKEND_API_URL =
 export async function getAnalysis(
   ticker: string
 ): Promise<PackedAnalysisData | null> {
-  const symbol = ticker.toUpperCase();
+  // Validate and sanitize input
+  const symbol = tickerSchema.parse(ticker);
 
   const analysis = await prisma.analysisResult.findFirst({
     where: {
@@ -49,6 +60,9 @@ export async function getAnalysis(
 }
 
 export async function triggerAnalysis(ticker: string) {
+  // Validate and sanitize input
+  const symbol = tickerSchema.parse(ticker);
+
   // Check authentication
   const session = await auth();
   if (!session?.user) {
@@ -62,7 +76,7 @@ export async function triggerAnalysis(ticker: string) {
     );
   }
 
-  const symbol = ticker.toUpperCase();
+  logger.debug("Triggering analysis", { symbol, userId: session.user.id });
 
   // Check if we have a recent analysis (within CACHE_VALIDITY_DAYS)
   const existing = await prisma.analysisResult.findFirst({
@@ -96,12 +110,10 @@ export async function triggerAnalysis(ticker: string) {
   });
 
   if (processingQuery && processingQuery.traceId) {
-    console.log(
-      "[triggerAnalysis] Found existing processing query for symbol:",
+    logger.debug("Found existing processing query", {
       symbol,
-      "traceId:",
-      processingQuery.traceId
-    );
+      traceId: processingQuery.traceId,
+    });
     // Return the existing trace ID so client can subscribe to its updates
     return { status: "processing", traceId: processingQuery.traceId };
   }
@@ -123,12 +135,11 @@ export async function triggerAnalysis(ticker: string) {
     const data = await response.json();
 
     // Create UserQuery to track this request
-    console.log(
-      "[triggerAnalysis] Creating UserQuery for user:",
-      session.user.id,
-      "symbol:",
-      symbol
-    );
+    logger.debug("Creating UserQuery", {
+      userId: session.user.id,
+      symbol,
+      traceId: data.traceId,
+    });
     const userQuery = await prisma.userQuery.create({
       data: {
         user: {
@@ -139,16 +150,19 @@ export async function triggerAnalysis(ticker: string) {
         traceId: data.traceId,
       },
     });
-    console.log("[triggerAnalysis] Created UserQuery:", userQuery.id);
+    logger.debug("UserQuery created", { queryId: userQuery.id });
 
     return { status: "processing", traceId: data.traceId };
   } catch (error) {
-    console.error("Error triggering analysis:", error);
+    logger.error("Error triggering analysis", { symbol, error });
     throw error;
   }
 }
 
 export async function forceRefreshAnalysis(ticker: string) {
+  // Validate and sanitize input
+  const symbol = tickerSchema.parse(ticker);
+
   // Check authentication
   const session = await auth();
   if (!session?.user) {
@@ -162,7 +176,10 @@ export async function forceRefreshAnalysis(ticker: string) {
     );
   }
 
-  const symbol = ticker.toUpperCase();
+  logger.debug("Force refreshing analysis", {
+    symbol,
+    userId: session.user.id,
+  });
 
   // Always trigger a new analysis, regardless of cache
   try {
@@ -181,12 +198,11 @@ export async function forceRefreshAnalysis(ticker: string) {
     const data = await response.json();
 
     // Create UserQuery to track this request
-    console.log(
-      "[forceRefreshAnalysis] Creating UserQuery for user:",
-      session.user.id,
-      "symbol:",
-      symbol
-    );
+    logger.debug("Creating UserQuery for force refresh", {
+      userId: session.user.id,
+      symbol,
+      traceId: data.traceId,
+    });
     const userQuery = await prisma.userQuery.create({
       data: {
         user: {
@@ -197,11 +213,13 @@ export async function forceRefreshAnalysis(ticker: string) {
         traceId: data.traceId,
       },
     });
-    console.log("[forceRefreshAnalysis] Created UserQuery:", userQuery.id);
+    logger.debug("UserQuery created for force refresh", {
+      queryId: userQuery.id,
+    });
 
     return { status: "processing", traceId: data.traceId };
   } catch (error) {
-    console.error("Error triggering analysis:", error);
+    logger.error("Error force refreshing analysis", { symbol, error });
     throw error;
   }
 }

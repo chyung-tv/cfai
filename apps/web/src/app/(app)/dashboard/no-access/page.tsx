@@ -29,10 +29,10 @@ export default function NoAccessPage() {
             Please reach out to our team to request beta access:
           </p>
           <a
-            href="mailto:beta@cfai.com"
+            href="mailto:chyung.tv@gmail.com"
             className="text-lg font-semibold text-blue-600 hover:underline"
           >
-            beta@cfai.com
+            chyung.tv@gmail.com
           </a>
         </div>
 

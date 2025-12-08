@@ -11,9 +11,25 @@ import { getAnalysis } from "@/lib/actions/analysis";
 import { RefreshAnalysisButton } from "@/components/analysis/refresh-analysis-button";
 import { auth, getUserAccess } from "@/lib/auth";
 import { redirect } from "next/navigation";
+import type { Metadata } from "next";
 
 interface AnalysisPageProps {
   params: Promise<{ ticker: string }>;
+}
+
+export async function generateMetadata({ params }: AnalysisPageProps): Promise<Metadata> {
+  const { ticker } = await params;
+  const symbol = ticker.toUpperCase();
+
+  return {
+    title: `${symbol} Stock Analysis | CFAI`,
+    description: `AI-powered fundamental analysis of ${symbol} stock - Business quality assessment, DCF valuation, growth feasibility, and portfolio allocation recommendations.`,
+    openGraph: {
+      title: `${symbol} Stock Analysis | CFAI`,
+      description: `AI-powered fundamental analysis of ${symbol} stock - Business quality assessment, DCF valuation, growth feasibility, and portfolio allocation recommendations.`,
+      type: "article",
+    },
+  };
 }
 
 export default async function AnalysisPage({ params }: AnalysisPageProps) {

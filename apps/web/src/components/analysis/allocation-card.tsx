@@ -7,6 +7,7 @@ import {
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Wallet, Briefcase, AlertTriangle, PieChart } from "lucide-react";
+import { formatSnakeCase } from "@/lib/utils";
 
 interface AllocationCardProps {
   recommendation: string;
@@ -25,12 +26,6 @@ export function AllocationCard({
   reasoning,
   className,
 }: AllocationCardProps) {
-  // Helper to format snake_case to Title Case
-  const formatText = (text: string) =>
-    text
-      .split("_")
-      .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-      .join(" ");
 
   // Helper for recommendation color
   const getRecColor = (rec: string) => {
@@ -69,7 +64,7 @@ export function AllocationCard({
             <Badge
               className={`${getRecColor(recommendation)} text-white text-lg px-6 py-2 shadow-sm`}
             >
-              {formatText(recommendation)}
+              {formatSnakeCase(recommendation)}
             </Badge>
             <div className="flex flex-col">
               <span className="text-xs text-slate-500 font-medium uppercase">
@@ -93,7 +88,7 @@ export function AllocationCard({
                   Role
                 </span>
                 <span className="text-xs font-medium text-slate-700 dark:text-slate-300">
-                  {formatText(portfolioRole)}
+                  {formatSnakeCase(portfolioRole)}
                 </span>
               </div>
             </div>
@@ -107,7 +102,7 @@ export function AllocationCard({
                   Risk
                 </span>
                 <span className="text-xs font-medium">
-                  {formatText(riskProfile)}
+                  {formatSnakeCase(riskProfile)}
                 </span>
               </div>
             </div>

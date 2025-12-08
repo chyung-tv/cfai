@@ -7,6 +7,7 @@ import {
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Shield, ShieldCheck, TrendingUp, Users } from "lucide-react";
+import { formatSnakeCase } from "@/lib/utils";
 
 interface BusinessQualityCardProps {
   tier: string;
@@ -23,12 +24,6 @@ export function BusinessQualityCard({
   explanation,
   className,
 }: BusinessQualityCardProps) {
-  // Helper to format snake_case to Title Case
-  const formatText = (text: string) =>
-    text
-      .split("_")
-      .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-      .join(" ");
 
   // Helper for tier color
   const getTierColor = (tier: string) => {
@@ -61,7 +56,7 @@ export function BusinessQualityCard({
               className={`${getTierColor(tier)} text-white px-3 py-1 text-sm w-fit`}
             >
               <ShieldCheck className="w-3 h-3 mr-1" />
-              {formatText(tier)}
+              {formatSnakeCase(tier)}
             </Badge>
           </div>
 
@@ -71,7 +66,7 @@ export function BusinessQualityCard({
             </span>
             <Badge variant="outline" className="px-3 py-1 text-sm w-fit">
               <TrendingUp className="w-3 h-3 mr-1 text-slate-500" />
-              {formatText(moat)}
+              {formatSnakeCase(moat)}
             </Badge>
           </div>
 
@@ -81,7 +76,7 @@ export function BusinessQualityCard({
             </span>
             <Badge variant="secondary" className="px-3 py-1 text-sm w-fit">
               <Users className="w-3 h-3 mr-1 text-slate-500" />
-              {formatText(marketStructure)}
+              {formatSnakeCase(marketStructure)}
             </Badge>
           </div>
         </div>
