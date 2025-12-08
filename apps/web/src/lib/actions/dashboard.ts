@@ -7,7 +7,10 @@ import { z } from "zod";
 import { logger } from "@/lib/logger";
 
 // Input validation schemas
-const queryIdSchema = z.string().uuid("Invalid query ID format");
+// CUIDs start with 'c' and are 25 characters long (alphanumeric)
+const queryIdSchema = z
+  .string()
+  .regex(/^c[a-z0-9]{24}$/, "Invalid query ID format");
 
 export async function checkUserAccess(): Promise<boolean> {
   const session = await auth();
