@@ -1,7 +1,9 @@
-import { useStreamGroup } from "@motiadev/stream-client-react";
+"use client";
+
+import { useEffect, useState, useRef } from "react";
 
 export interface AnalysisStreamEvent {
-  id: string;
+  traceId: string;
   symbol: string;
   status: string;
 }
@@ -11,43 +13,63 @@ interface UseAnalysisStreamOptions {
 }
 
 interface UseAnalysisStreamReturn {
-  event: AnalysisStreamEvent | null;
   status: string;
   isError: boolean;
-  allEvents: AnalysisStreamEvent[];
 }
 
 /**
- * Hook to subscribe to stock-analysis-stream and extract relevant event data
- * @param options - Configuration options
- * @param options.traceId - Optional trace ID to filter events for a specific analysis
- * @returns Object containing event data, status message, error state, and all events
+ * Hook to subscribe to analysis status via SSE (proxied through Next.js).
+ * Replaces WebSocket stream with Server-Sent Events.
  */
 export function useAnalysisStream(
   options: UseAnalysisStreamOptions = {}
 ): UseAnalysisStreamReturn {
   const { traceId } = options;
+  const [status, setStatus] = useState("Initializing analysis...");
+  const [isError, setIsError] = useState(false);
+  const completedRef = useRef(false);
 
-  const { data: streamData = [] } = useStreamGroup<AnalysisStreamEvent>({
-    streamName: "stock-analysis-stream",
-    groupId: "analysis",
-  });
+  useEffect(() => {
+    if (!traceId) {
+      setStatus("Initializing analysis...");
+      return;
+    }
 
-  // Find relevant event for this traceId (if provided)
-  const event =
-    traceId && streamData.length > 0
-      ? streamData.find((item) => item.id === traceId) || null
-      : null;
+    completedRef.current = false;
+    const url = `/api/analysis/${traceId}/stream`;
+    const eventSource = new EventSource(url);
 
-  const status = event?.status || "Initializing analysis...";
-  const isError =
-    status.toLowerCase().includes("error") ||
-    status.toLowerCase().includes("failed");
+    eventSource.onmessage = (e) => {
+      try {
+        const data = JSON.parse(e.data) as AnalysisStreamEvent;
+        setStatus(data.status);
+        if (data.status === "Analysis completed") {
+          completedRef.current = true;
+          eventSource.close();
+        } else if (
+          data.status.toLowerCase().includes("error") ||
+          data.status.toLowerCase().includes("failed")
+        ) {
+          setIsError(true);
+          eventSource.close();
+        }
+      } catch {
+        // ignore malformed
+      }
+    };
 
-  return {
-    event,
-    status,
-    isError,
-    allEvents: streamData,
-  };
+    eventSource.onerror = () => {
+      eventSource.close();
+      if (!completedRef.current) {
+        setIsError(true);
+        setStatus("Connection lost");
+      }
+    };
+
+    return () => {
+      eventSource.close();
+    };
+  }, [traceId]);
+
+  return { status, isError };
 }

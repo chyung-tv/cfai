@@ -1,0 +1,87 @@
+# CFAI - VPS Deployment
+# Usage: docker compose up -d
+# Requires: .env with DATABASE_URL, REDIS_URL, BACKEND_API_KEY, etc.
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-cfai}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: ${POSTGRES_DB:-cfai}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-cfai}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: .
+      dockerfile: apps/backend/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-cfai}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-cfai}
+      REDIS_URL: redis://redis:6379
+      BACKEND_API_KEY: ${BACKEND_API_KEY:?Set BACKEND_API_KEY in .env}
+      GOOGLE_API_KEY: ${GOOGLE_API_KEY:?Set GOOGLE_API_KEY in .env}
+      FMP_API_KEY: ${FMP_API_KEY:?Set FMP_API_KEY in .env}
+      FMP_BASE_URL: ${FMP_BASE_URL:-https://financialmodelingprep.com/api/v3}
+    # Internal only - Caddy proxies to it
+
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      - backend
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-cfai}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-cfai}
+      BACKEND_URL: http://backend:3001
+      BACKEND_API_KEY: ${BACKEND_API_KEY}
+      NEXTAUTH_URL: ${NEXTAUTH_URL:?Set NEXTAUTH_URL in .env}
+      NEXTAUTH_SECRET: ${NEXTAUTH_SECRET:?Set NEXTAUTH_SECRET in .env}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:?Set GOOGLE_CLIENT_ID in .env}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:?Set GOOGLE_CLIENT_SECRET in .env}
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - web
+
+volumes:
+  postgres_data:
+  redis_data:
+  caddy_data:
+  caddy_config:

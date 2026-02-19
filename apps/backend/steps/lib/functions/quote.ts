@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { getCachedQuote, setCachedQuote } from "../../../lib/fmp-cache";
 
 export const quoteSchema = z.object({
   symbol: z.string(),
@@ -10,6 +11,11 @@ export const quoteSchema = z.object({
 export type QuoteData = z.infer<typeof quoteSchema>;
 
 export async function fetchQuote(symbol: string) {
+  const cached = await getCachedQuote(symbol);
+  if (cached) {
+    return quoteSchema.parse(cached);
+  }
+
   const fmpApiKey = process.env.FMP_API_KEY;
   let baseURL = process.env.FMP_BASE_URL;
 
@@ -21,7 +27,6 @@ export async function fetchQuote(symbol: string) {
     baseURL = `${baseURL}/`;
   }
 
-  // Using the query parameter format as seen in other files
   const quoteUrl = `${baseURL}quote?symbol=${symbol}&apikey=${fmpApiKey}`;
 
   try {
@@ -38,13 +43,13 @@ export async function fetchQuote(symbol: string) {
     }
 
     const data = quoteData[0];
-
-    // Calculate sharesOutstanding if missing
     if (!data.sharesOutstanding && data.marketCap && data.price) {
       data.sharesOutstanding = Math.round(data.marketCap / data.price);
     }
 
-    return quoteSchema.parse(data);
+    const parsed = quoteSchema.parse(data);
+    await setCachedQuote(symbol, parsed);
+    return parsed;
   } catch (error) {
     console.error(`Error fetching quote for ${symbol}:`, error);
     throw error;

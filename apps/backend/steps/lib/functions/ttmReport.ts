@@ -1,7 +1,5 @@
-import { config } from "dotenv";
-// Load environment variables from .env.local
-config({ path: ".env.local" });
 import z from "zod";
+import { getCachedTtm, setCachedTtm } from "../../../lib/fmp-cache";
 
 export const balanceSheetDataSchema = z.array(
   z.object({
@@ -215,11 +213,16 @@ function extractMetadata<T extends Record<string, any>>(
 }
 
 export async function fetchFinancialReportData(symbol: string) {
+  const cached = await getCachedTtm(symbol);
+  if (cached && typeof cached === "object" && "balanceSheet" in cached) {
+    return cached as Awaited<ReturnType<typeof fetchFinancialReportData>>;
+  }
+
   const fmpApiKey = process.env.FMP_API_KEY;
   let baseURL = process.env.FMP_BASE_URL;
 
   if (!fmpApiKey) {
-    console.error("FMP API Key is not set in .env.local");
+    console.error("FMP API Key is not set");
     return null;
   }
 
@@ -227,7 +230,6 @@ export async function fetchFinancialReportData(symbol: string) {
     baseURL = `${baseURL}/`;
   }
 
-  // Define the URLs for the API calls
   const urls = {
     balanceSheet: `${baseURL}balance-sheet-statement?symbol=${symbol}&period=quarter&limit=1&apikey=${fmpApiKey}`,
     incomeStatement: `${baseURL}income-statement?symbol=${symbol}&period=quarter&limit=4&apikey=${fmpApiKey}`,
@@ -320,16 +322,17 @@ export async function fetchFinancialReportData(symbol: string) {
         validatedCashflowStatementData,
         cashflowExcludeFromSum
       ),
-      // Point-in-time values
       cashAtEndOfPeriod: mostRecentCashflow.cashAtEndOfPeriod,
       cashAtBeginningOfPeriod: oldestCashflow.cashAtBeginningOfPeriod,
     };
 
-    return {
+    const result = {
       balanceSheet: ttmBalanceSheet,
       incomeStatement: ttmIncomeStatement,
       cashflowStatement: ttmCashflowStatement,
     };
+    await setCachedTtm(symbol, result);
+    return result;
   } catch (error) {
     console.error("Error fetching financial data:", error);
     return null;

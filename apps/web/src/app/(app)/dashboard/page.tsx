@@ -47,7 +47,6 @@ import {
   checkUserAccess,
 } from "@/lib/actions/dashboard";
 import { triggerAnalysis } from "@/lib/actions/analysis";
-import { useAnalysisStream } from "@/hooks/useAnalysisStream";
 function StatusBadge({ status }: { status: AnalysisStatus }) {
   const variants = {
     completed: {
@@ -177,9 +176,6 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [hasAccess, setHasAccess] = useState(true);
 
-  // Subscribe to stream events using shared hook
-  const { allEvents: streamData } = useAnalysisStream();
-
   // Fetch initial data
   useEffect(() => {
     const fetchData = async () => {
@@ -192,7 +188,10 @@ export default function DashboardPage() {
         setQueries(data as UserQueryWithResult[]);
 
         // Sync processing queries in parallel
-        const processingQueries = data.filter((q) => q.status === "processing");
+        const typedData = data as UserQueryWithResult[];
+        const processingQueries = typedData.filter(
+          (q) => q.status === "processing"
+        );
         if (processingQueries.length > 0) {
           await Promise.all(
             processingQueries.map((query) => syncQueryStatus(query.id))
@@ -212,46 +211,25 @@ export default function DashboardPage() {
     fetchData();
   }, []);
 
-  // Update status based on stream events
+  // Poll processing queries for status updates
   useEffect(() => {
-    if (streamData.length === 0 || queries.length === 0) return;
+    const processingQueries = queries.filter((q) => q.status === "processing");
+    if (processingQueries.length === 0) return;
 
-    // Use a flag to track if we need to refresh
-    let needsRefresh = false;
-
-    const updateQueries = async () => {
-      for (const query of queries) {
-        if (!query.traceId) continue;
-
-        const event = streamData.find((item) => item.id === query.traceId);
-        if (!event) continue;
-
-        // Check if stream indicates completion
-        if (event.status === "Analysis completed") {
-          await syncQueryStatus(query.id);
-          needsRefresh = true;
-        }
-
-        // Check if stream indicates failure
-        if (
-          event.status.toLowerCase().includes("error") ||
-          event.status.toLowerCase().includes("failed")
-        ) {
-          await markQueryAsFailed(query.id);
-          needsRefresh = true;
-        }
+    const interval = setInterval(async () => {
+      let needsRefresh = false;
+      for (const query of processingQueries) {
+        await syncQueryStatus(query.id);
+        needsRefresh = true;
       }
-
-      // Refresh data if any status changed
       if (needsRefresh) {
         const refreshedData = await getUserQueryHistory();
         setQueries(refreshedData as UserQueryWithResult[]);
       }
-    };
+    }, 5000);
 
-    updateQueries();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [streamData]);
+    return () => clearInterval(interval);
+  }, [queries]);
 
   const handleRetry = useCallback(async (symbol: string) => {
     try {

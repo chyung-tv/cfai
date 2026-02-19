@@ -5,6 +5,7 @@ import z from "zod";
 import { dcfResultSchema } from "./dcf.step";
 import { qualitativeAnalysisSchema } from "./qualitative-analysis.step";
 import { getValidatedState } from "../lib/statehooks";
+import { publishAnalysisStatus } from "../../lib/status-stream";
 
 const inputSchema = z.object({
   symbol: z.string(),
@@ -24,7 +25,7 @@ export const config: EventConfig = {
 
 export const handler: Handlers["RateStock"] = async (
   input,
-  { logger, state, traceId, emit, streams }
+  { logger, state, traceId, emit }
 ) => {
   const { symbol } = input;
   logger.info("Retrieving and validating data from state", { traceId });
@@ -65,22 +66,11 @@ export const handler: Handlers["RateStock"] = async (
   };
 
   logger.info("Generating stock rating", { symbol, traceId });
-  await streams["stock-analysis-stream"].set("analysis", traceId, {
-    id: traceId,
-    symbol,
-    status: "Gemini is generating stock rating...",
-  });
+  await publishAnalysisStatus(traceId, symbol, "Gemini is generating stock rating...");
   const rating = await rateStock(ratingInput);
-
-  // store to state
   await state.set("stock-rating", traceId, rating);
-
   logger.info("Stock rating generated successfully", { symbol, traceId });
-  await streams["stock-analysis-stream"].set("analysis", traceId, {
-    id: traceId,
-    symbol,
-    status: "Stock rating generated successfully.",
-  });
+  await publishAnalysisStatus(traceId, symbol, "Stock rating generated successfully.");
 
   // emit event
   await emit({

@@ -4,12 +4,14 @@ CFAI is an intelligent financial platform that shifts from passive stock analysi
 
 ## 🏗️ Architecture
 
-**Monorepo Structure** (Turborepo):
+**Monorepo** (Turborepo + pnpm):
 
-- `apps/backend`: **Motia** event-driven analysis engine (Port 3001)
+- `apps/backend`: **Motia** event-driven analysis engine (Port 3001) – Redis state, BullMQ, SSE
 - `apps/web`: **Next.js 15** frontend with NextAuth (Port 3000)
 - `packages/db`: Shared Prisma schema and client
-- `packages/types`: Shared Zod schemas exported by both services
+- `packages/types`: Shared Zod schemas for FE/BE contract
+
+**VPS Deployment**: Docker Compose with Postgres, Redis, Caddy. See `docs/DEPLOYMENT-VPS.md` and `docs/API-CONTRACT.md`.
 
 ## 🚀 Core Features
 
@@ -39,32 +41,37 @@ The core workspace for simulation and construction.
 
 ### Prerequisites
 
-- Node.js 18+
+- Node.js 20+
 - pnpm
 - PostgreSQL
-- Redis (for Motia backend)
+- Redis
 
 ### Installation
 
 ```bash
-# Install dependencies
-pnpm install
-
-# Set up environment variables
-cp .env.example .env.local
+pnpm install --ignore-scripts
+cp .env.example .env
+# Edit .env with DATABASE_URL, REDIS_URL, BACKEND_API_KEY, etc.
 ```
 
-### Development
+### Development (local)
 
 ```bash
-# Start the entire stack (Frontend + Backend)
-pnpm dev
+# Option 1: Docker for Postgres + Redis only
+docker compose up postgres redis -d
 
-# Run only the backend (Motia Workbench)
+# Backend (REDIS_URL=redis://localhost:6379, DATABASE_URL=...)
 cd apps/backend && pnpm dev
 
-# Run only the frontend
+# Web (BACKEND_URL=http://localhost:3001, BACKEND_API_KEY=...)
 cd apps/web && pnpm dev
+```
+
+### Production (VPS)
+
+```bash
+docker compose up -d
+# First run: docker compose exec web pnpm exec prisma migrate deploy --schema=../../packages/db/prisma/schema.prisma
 ```
 
 ## 🔄 Workflow (The "Pivot Flow")

@@ -4,6 +4,7 @@ import z from "zod";
 import { getValidatedState } from "../lib/statehooks";
 import { growthJudgementSchema } from "./judgement.step";
 import { reverseDcfAnalysisSchema } from "./reverse-dcf.step";
+import { publishAnalysisStatus } from "../../lib/status-stream";
 
 const inputSchema = z.object({
   symbol: z.string(),
@@ -21,15 +22,11 @@ export const config: EventConfig = {
 
 export const handler: Handlers["DCF"] = async (
   input,
-  { logger, state, emit, traceId, streams }
+  { logger, state, emit, traceId }
 ) => {
   const { symbol } = input;
   logger.info("Starting DCF processing for", { symbol });
-  await streams["stock-analysis-stream"].set("analysis", traceId, {
-    id: traceId,
-    symbol,
-    status: "Calculating DCF from AI projections...",
-  });
+  await publishAnalysisStatus(traceId, symbol, "Calculating DCF from AI projections...");
 
   // 1. Retrieve Growth Judgement (AI Assumptions)
   const judgement = await getValidatedState(
@@ -140,11 +137,7 @@ export const handler: Handlers["DCF"] = async (
   logger.info("Saving DCF result to state", { traceId });
   await state.set("dcf", traceId, finalResult);
 
-  await streams["stock-analysis-stream"].set("analysis", traceId, {
-    id: traceId,
-    symbol,
-    status: "DCF calculation and sensitivity analysis completed.",
-  });
+  await publishAnalysisStatus(traceId, symbol, "DCF calculation and sensitivity analysis completed.");
 
   await emit({
     topic: "finish-dcf",

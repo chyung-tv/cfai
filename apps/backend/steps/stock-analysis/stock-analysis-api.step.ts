@@ -1,5 +1,6 @@
 import type { ApiRouteConfig, Handlers } from "motia";
 import { z } from "zod";
+import { publishAnalysisStatus } from "../../lib/status-stream";
 
 const stockQuerySchema = z.string().min(1);
 
@@ -22,7 +23,7 @@ export const config: ApiRouteConfig = {
 
 export const handler: Handlers["StockAnalysisAPI"] = async (
   req,
-  { emit, logger, traceId, streams }
+  { emit, logger, traceId }
 ) => {
   const { symbol } = req.queryParams;
   const parsedSymbol = stockQuerySchema.parse(symbol);
@@ -30,6 +31,8 @@ export const handler: Handlers["StockAnalysisAPI"] = async (
   logger.info(
     `StockAnalysis API endpoint called for ticker ${parsedSymbol}, trace ID: ${traceId}`
   );
+
+  await publishAnalysisStatus(traceId, parsedSymbol, "Analysis queued, starting soon...");
 
   await emit({
     topic: "process-stock-analysis",

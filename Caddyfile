@@ -1,0 +1,22 @@
+# CFAI - Caddy reverse proxy
+# Handles SSL, routes / to web, /api/backend to backend
+# Replace example.com with your domain for automatic HTTPS
+
+{
+    # Optional: email for Let's Encrypt
+    # email admin@example.com
+}
+
+:80 {
+    # For local/dev: use :80
+    # For production: use your domain, e.g. cfai.example.com
+    # Caddy will auto-provision SSL via Let's Encrypt
+
+    # All traffic to Next.js (Next.js handles /api/* routing internally)
+    reverse_proxy web:3000
+}
+
+# Production example (uncomment and adjust domain):
+# cfai.example.com {
+#     reverse_proxy web:3000
+# }

@@ -7,6 +7,7 @@ import { dcfResultSchema } from "./dcf.step";
 import { ratingSchema } from "../lib/ai-functions/rating";
 import { parseThesis } from "../lib/ai-functions/parseThesis";
 import { reverseDcfAnalysisSchema } from "./reverse-dcf.step";
+import { publishAnalysisStatus } from "../../lib/status-stream";
 
 const inputSchema = z.object({
   symbol: z.string(),
@@ -24,15 +25,11 @@ export const config: EventConfig = {
 
 export const handler: Handlers["return-db"] = async (
   input,
-  { logger, state, traceId, streams }
+  { logger, state, traceId }
 ) => {
   const { symbol } = input;
   logger.info("Retrieving and validating data from state", { traceId });
-  await streams["stock-analysis-stream"].set("analysis", traceId, {
-    id: traceId,
-    symbol,
-    status: "Packing up data...",
-  });
+  await publishAnalysisStatus(traceId, symbol, "Packing up data...");
   const dcfData = await getValidatedState(
     "dcf",
     dcfResultSchema,
@@ -121,23 +118,5 @@ export const handler: Handlers["return-db"] = async (
     } as any,
   });
   logger.info("Analysis result saved to database", { traceId });
-
-  // Send final completion status
-  await streams["stock-analysis-stream"].set("analysis", traceId, {
-    id: traceId,
-    symbol,
-    status: "Analysis completed",
-  });
-
-  // Clean up stream data after a short delay to allow client to receive completion
-  setTimeout(async () => {
-    try {
-      await streams["stock-analysis-stream"].delete("analysis", traceId);
-      logger.info("Stream data cleaned up", { traceId });
-    } catch (e) {
-      logger.warn("Failed to clean up stream data", { traceId, error: e });
-    }
-  }, 5000);
-
-  return;
-};
+  await publishAnalysisStatus(traceId, symbol, "Analysis completed");
+}

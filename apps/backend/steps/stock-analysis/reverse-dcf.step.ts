@@ -7,6 +7,7 @@ import {
   reverseDcfResultSchema,
   type ReverseDcfResult,
 } from "../lib/functions/reverse-dcf";
+import { publishAnalysisStatus } from "../../lib/status-stream";
 
 const inputSchema = z.object({
   symbol: z.string(),
@@ -24,18 +25,13 @@ export const config: EventConfig = {
 
 export const handler: Handlers["ProcessReverseDcfAnalysis"] = async (
   input,
-  { logger, state, emit, traceId, streams }
+  { logger, state, emit, traceId }
 ) => {
   const { symbol } = input;
 
   logger.info("Processing reverse DCF analysis", { symbol });
 
-  // Stream to client
-  await streams["stock-analysis-stream"].set("analysis", traceId, {
-    id: traceId,
-    symbol,
-    status: "Fetching current stock price and market data...",
-  });
+  await publishAnalysisStatus(traceId, symbol, "Fetching current stock price and market data...");
 
   // Step 1: Fetch quote data
   logger.info("Fetching quote data", { symbol });
@@ -46,12 +42,7 @@ export const handler: Handlers["ProcessReverseDcfAnalysis"] = async (
     marketCap: quote.marketCap,
   });
 
-  // Step 2: Fetch TTM financial reports
-  await streams["stock-analysis-stream"].set("analysis", traceId, {
-    id: traceId,
-    symbol,
-    status: "Fetching trailing twelve months financial data...",
-  });
+  await publishAnalysisStatus(traceId, symbol, "Fetching trailing twelve months financial data...");
 
   logger.info("Fetching TTM financial data");
   const financialData = await fetchFinancialReportData(symbol);
@@ -63,12 +54,7 @@ export const handler: Handlers["ProcessReverseDcfAnalysis"] = async (
 
   logger.info("TTM financial data fetched successfully");
 
-  // Step 3: Parse inputs for reverse DCF
-  await streams["stock-analysis-stream"].set("analysis", traceId, {
-    id: traceId,
-    symbol,
-    status: "Calculating implied growth rates across discount rates...",
-  });
+  await publishAnalysisStatus(traceId, symbol, "Calculating implied growth rates across discount rates...");
 
   const ttmRevenue = financialData.incomeStatement.revenue as number;
   const ttmFreeCashFlow = financialData.cashflowStatement
@@ -114,12 +100,7 @@ export const handler: Handlers["ProcessReverseDcfAnalysis"] = async (
       resultsCount: reverseDcfResults.length,
     });
 
-    // Stream success
-    await streams["stock-analysis-stream"].set("analysis", traceId, {
-      id: traceId,
-      symbol,
-      status: "Reverse DCF analysis completed successfully.",
-    });
+    await publishAnalysisStatus(traceId, symbol, "Reverse DCF analysis completed successfully.");
 
     // Store results for downstream steps
     await state.set("reverse-dcf-analysis", traceId, {
@@ -145,13 +126,11 @@ export const handler: Handlers["ProcessReverseDcfAnalysis"] = async (
     logger.info("Reverse DCF step completed successfully");
   } catch (error) {
     logger.error("Reverse DCF calculation failed", { error });
-
-    await streams["stock-analysis-stream"].set("analysis", traceId, {
-      id: traceId,
+    await publishAnalysisStatus(
+      traceId,
       symbol,
-      status: `Reverse DCF failed: ${error instanceof Error ? error.message : "Unknown error"}`,
-    });
-
+      `Reverse DCF failed: ${error instanceof Error ? error.message : "Unknown error"}`
+    );
     throw error;
   }
 };

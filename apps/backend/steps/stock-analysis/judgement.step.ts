@@ -4,6 +4,7 @@ import { getValidatedState } from "../lib/statehooks";
 import { qualitativeAnalysisSchema } from "./qualitative-analysis.step";
 import { reverseDcfAnalysisSchema } from "./reverse-dcf.step";
 import { evaluateGrowthFeasibility } from "../lib/ai-functions/judgement";
+import { publishAnalysisStatus } from "../../lib/status-stream";
 
 const inputSchema = z.object({
   symbol: z.string(),
@@ -22,18 +23,13 @@ export const config: EventConfig = {
 
 export const handler: Handlers["ProcessGrowthJudgement"] = async (
   input,
-  { logger, state, emit, traceId, streams }
+  { logger, state, emit, traceId }
 ) => {
   const { symbol } = input;
 
   logger.info("Processing growth judgement analysis", { symbol });
 
-  // Stream to client
-  await streams["stock-analysis-stream"].set("analysis", traceId, {
-    id: traceId,
-    symbol,
-    status: "Retrieving qualitative analysis and reverse DCF results...",
-  });
+  await publishAnalysisStatus(traceId, symbol, "Retrieving qualitative analysis and reverse DCF results...");
 
   // Step 1: Retrieve qualitative analysis from state
   const qualitativeAnalysis = await getValidatedState(
@@ -64,12 +60,7 @@ export const handler: Handlers["ProcessGrowthJudgement"] = async (
     currentPrice: reverseDcfAnalysis.currentPrice,
   });
 
-  // Step 3: Call AI judgement function
-  await streams["stock-analysis-stream"].set("analysis", traceId, {
-    id: traceId,
-    symbol,
-    status: "AI is judging the feasibility of implied growth rates...",
-  });
+  await publishAnalysisStatus(traceId, symbol, "AI is judging the feasibility of implied growth rates...");
 
   logger.info("Calling AI growth judgement function");
 
@@ -83,12 +74,7 @@ export const handler: Handlers["ProcessGrowthJudgement"] = async (
     predictedCagr: judgementResult.independentPrediction.predictedCagr,
   });
 
-  // Stream success
-  await streams["stock-analysis-stream"].set("analysis", traceId, {
-    id: traceId,
-    symbol,
-    status: "Growth feasibility judgement completed.",
-  });
+  await publishAnalysisStatus(traceId, symbol, "Growth feasibility judgement completed.");
 
   // Store judgement for downstream steps
   await state.set("growth-judgement", traceId, judgementResult);

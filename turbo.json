@@ -25,14 +25,14 @@
         "NEXTAUTH_URL",
         "NEXTAUTH_SECRET",
         "DATABASE_URL",
-        "NEXT_PUBLIC_BACKEND_URL",
-        "NEXT_PUBLIC_BACKEND_WS_URL"
+        "BACKEND_URL",
+        "BACKEND_API_KEY"
       ],
       "outputs": [".next/**", "!.next/cache/**"]
     },
     "backend#build": {
       "dependsOn": ["^build"],
-      "env": ["GOOGLE_API_KEY", "FMP_API_KEY", "FMP_BASE_URL", "DATABASE_URL"],
+      "env": ["GOOGLE_API_KEY", "FMP_API_KEY", "FMP_BASE_URL", "DATABASE_URL", "REDIS_URL", "BACKEND_API_KEY"],
       "outputs": ["dist/**", ".motia/**"]
     },
     "lint": {

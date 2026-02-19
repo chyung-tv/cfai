@@ -7,7 +7,7 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 import { logger } from "@/lib/logger";
 
-const CACHE_VALIDITY_DAYS = 5;
+const CACHE_VALIDITY_DAYS = 7;
 
 // Input validation schemas
 const tickerSchema = z
@@ -17,11 +17,9 @@ const tickerSchema = z
   .regex(/^[A-Z0-9]+$/, "Ticker symbol must be uppercase letters/numbers only")
   .transform((val) => val.toUpperCase());
 
-// Backend API URL
-// Local: http://localhost:3001
-// Production: https://your-project.motia.cloud (from Motia Cloud dashboard)
-const BACKEND_API_URL =
-  process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:3001";
+// Backend API URL (server-side only - not exposed to browser)
+const BACKEND_URL = process.env.BACKEND_URL || "http://localhost:3001";
+const BACKEND_API_KEY = process.env.BACKEND_API_KEY;
 
 export async function getAnalysis(
   ticker: string
@@ -118,13 +116,17 @@ export async function triggerAnalysis(ticker: string) {
     return { status: "processing", traceId: processingQuery.traceId };
   }
 
-  // Call backend API
+  if (!BACKEND_API_KEY) {
+    throw new Error("BACKEND_API_KEY not configured");
+  }
+
   try {
     const response = await fetch(
-      `${BACKEND_API_URL}/stock/search?symbol=${symbol}`,
+      `${BACKEND_URL}/stock/search?symbol=${symbol}`,
       {
         method: "GET",
         cache: "no-store",
+        headers: { "X-API-Key": BACKEND_API_KEY },
       }
     );
 
@@ -181,13 +183,17 @@ export async function forceRefreshAnalysis(ticker: string) {
     userId: session.user.id,
   });
 
-  // Always trigger a new analysis, regardless of cache
+  if (!BACKEND_API_KEY) {
+    throw new Error("BACKEND_API_KEY not configured");
+  }
+
   try {
     const response = await fetch(
-      `${BACKEND_API_URL}/stock/search?symbol=${symbol}`,
+      `${BACKEND_URL}/stock/search?symbol=${symbol}`,
       {
         method: "GET",
         cache: "no-store",
+        headers: { "X-API-Key": BACKEND_API_KEY },
       }
     );
 

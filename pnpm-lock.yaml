@@ -38,24 +38,27 @@ importers:
       '@motiadev/adapter-bullmq-events':
         specifier: 0.15.4-beta.169
         version: 0.15.4-beta.169(@motiadev/core@0.15.4-beta.169(@types/node@24.10.1)(redis@5.10.0)(typescript@5.9.2))
+      '@motiadev/adapter-redis-state':
+        specifier: 0.15.4-beta.169
+        version: 0.15.4-beta.169(@motiadev/core@0.15.4-beta.169(@types/node@24.10.1)(redis@5.10.0)(typescript@5.9.2))
       '@motiadev/core':
         specifier: 0.15.4-beta.169
         version: 0.15.4-beta.169(@types/node@24.10.1)(redis@5.10.0)(typescript@5.9.2)
       '@motiadev/plugin-bullmq':
         specifier: 0.15.4-beta.169
-        version: 0.15.4-beta.169(@motiadev/adapter-bullmq-events@0.15.4-beta.169(@motiadev/core@0.15.4-beta.169(@types/node@24.10.1)(redis@5.10.0)(typescript@5.9.2)))(@motiadev/core@0.15.4-beta.169(@types/node@24.10.1)(redis@5.10.0)(typescript@5.9.2))(@motiadev/stream-client-react@0.15.4-beta.169(react@19.2.0))(@motiadev/ui@0.15.4-beta.169(@types/react-dom@19.2.2(@types/react@19.2.2))(@types/react@19.2.2)(react-dom@19.2.0(react@19.2.0))(react@19.2.0)(use-sync-external-store@1.6.0(react@19.2.0)))(@types/react@19.2.2)(react@19.2.0)(use-sync-external-store@1.6.0(react@19.2.0))
+        version: 0.15.4-beta.169(@motiadev/adapter-bullmq-events@0.15.4-beta.169(@motiadev/core@0.15.4-beta.169(@types/node@24.10.1)(redis@5.10.0)(typescript@5.9.2)))(@motiadev/core@0.15.4-beta.169(@types/node@24.10.1)(redis@5.10.0)(typescript@5.9.2))(@motiadev/stream-client-react@0.17.14-beta.196(react@19.2.0))(@motiadev/ui@0.17.14-beta.196(@types/react-dom@19.2.2(@types/react@19.2.2))(@types/react@19.2.2)(lucide-react@0.555.0(react@19.2.0))(react-dom@19.2.0(react@19.2.0))(react@19.2.0)(use-sync-external-store@1.6.0(react@19.2.0)))(@types/react@19.2.2)(react@19.2.0)(use-sync-external-store@1.6.0(react@19.2.0))
       '@motiadev/plugin-endpoint':
         specifier: 0.15.4-beta.169
-        version: 0.15.4-beta.169(@motiadev/core@0.15.4-beta.169(@types/node@24.10.1)(redis@5.10.0)(typescript@5.9.2))(@motiadev/stream-client-react@0.15.4-beta.169(react@19.2.0))(@motiadev/ui@0.15.4-beta.169(@types/react-dom@19.2.2(@types/react@19.2.2))(@types/react@19.2.2)(react-dom@19.2.0(react@19.2.0))(react@19.2.0)(use-sync-external-store@1.6.0(react@19.2.0)))(@types/react@19.2.2)(monaco-editor@0.55.1)(react-dom@19.2.0(react@19.2.0))(use-sync-external-store@1.6.0(react@19.2.0))
+        version: 0.15.4-beta.169(@motiadev/core@0.15.4-beta.169(@types/node@24.10.1)(redis@5.10.0)(typescript@5.9.2))(@motiadev/stream-client-react@0.17.14-beta.196(react@19.2.0))(@motiadev/ui@0.17.14-beta.196(@types/react-dom@19.2.2(@types/react@19.2.2))(@types/react@19.2.2)(lucide-react@0.555.0(react@19.2.0))(react-dom@19.2.0(react@19.2.0))(react@19.2.0)(use-sync-external-store@1.6.0(react@19.2.0)))(@types/react@19.2.2)(monaco-editor@0.55.1)(react-dom@19.2.0(react@19.2.0))(use-sync-external-store@1.6.0(react@19.2.0))
       '@motiadev/plugin-logs':
         specifier: 0.15.4-beta.169
-        version: 0.15.4-beta.169(@motiadev/core@0.15.4-beta.169(@types/node@24.10.1)(redis@5.10.0)(typescript@5.9.2))(@motiadev/stream-client-browser@0.15.4-beta.169)(@motiadev/ui@0.15.4-beta.169(@types/react-dom@19.2.2(@types/react@19.2.2))(@types/react@19.2.2)(react-dom@19.2.0(react@19.2.0))(react@19.2.0)(use-sync-external-store@1.6.0(react@19.2.0)))(@types/react@19.2.2)(use-sync-external-store@1.6.0(react@19.2.0))
+        version: 0.15.4-beta.169(@motiadev/core@0.15.4-beta.169(@types/node@24.10.1)(redis@5.10.0)(typescript@5.9.2))(@motiadev/stream-client-browser@0.17.14-beta.196)(@motiadev/ui@0.17.14-beta.196(@types/react-dom@19.2.2(@types/react@19.2.2))(@types/react@19.2.2)(lucide-react@0.555.0(react@19.2.0))(react-dom@19.2.0(react@19.2.0))(react@19.2.0)(use-sync-external-store@1.6.0(react@19.2.0)))(@types/react@19.2.2)(use-sync-external-store@1.6.0(react@19.2.0))
       '@motiadev/plugin-observability':
         specifier: 0.15.4-beta.169
-        version: 0.15.4-beta.169(@motiadev/core@0.15.4-beta.169(@types/node@24.10.1)(redis@5.10.0)(typescript@5.9.2))(@motiadev/stream-client-react@0.15.4-beta.169(react@19.2.0))(@motiadev/ui@0.15.4-beta.169(@types/react-dom@19.2.2(@types/react@19.2.2))(@types/react@19.2.2)(react-dom@19.2.0(react@19.2.0))(react@19.2.0)(use-sync-external-store@1.6.0(react@19.2.0)))(@types/react-dom@19.2.2(@types/react@19.2.2))(@types/react@19.2.2)(react-dom@19.2.0(react@19.2.0))(use-sync-external-store@1.6.0(react@19.2.0))
+        version: 0.15.4-beta.169(@motiadev/core@0.15.4-beta.169(@types/node@24.10.1)(redis@5.10.0)(typescript@5.9.2))(@motiadev/stream-client-react@0.17.14-beta.196(react@19.2.0))(@motiadev/ui@0.17.14-beta.196(@types/react-dom@19.2.2(@types/react@19.2.2))(@types/react@19.2.2)(lucide-react@0.555.0(react@19.2.0))(react-dom@19.2.0(react@19.2.0))(react@19.2.0)(use-sync-external-store@1.6.0(react@19.2.0)))(@types/react-dom@19.2.2(@types/react@19.2.2))(@types/react@19.2.2)(react-dom@19.2.0(react@19.2.0))(use-sync-external-store@1.6.0(react@19.2.0))
       '@motiadev/plugin-states':
         specifier: 0.15.4-beta.169
-        version: 0.15.4-beta.169(@motiadev/core@0.15.4-beta.169(@types/node@24.10.1)(redis@5.10.0)(typescript@5.9.2))(@motiadev/ui@0.15.4-beta.169(@types/react-dom@19.2.2(@types/react@19.2.2))(@types/react@19.2.2)(react-dom@19.2.0(react@19.2.0))(react@19.2.0)(use-sync-external-store@1.6.0(react@19.2.0)))(@types/react@19.2.2)(monaco-editor@0.55.1)(react-dom@19.2.0(react@19.2.0))(react@19.2.0)(use-sync-external-store@1.6.0(react@19.2.0))
+        version: 0.15.4-beta.169(@motiadev/core@0.15.4-beta.169(@types/node@24.10.1)(redis@5.10.0)(typescript@5.9.2))(@motiadev/ui@0.17.14-beta.196(@types/react-dom@19.2.2(@types/react@19.2.2))(@types/react@19.2.2)(lucide-react@0.555.0(react@19.2.0))(react-dom@19.2.0(react@19.2.0))(react@19.2.0)(use-sync-external-store@1.6.0(react@19.2.0)))(@types/react@19.2.2)(monaco-editor@0.55.1)(react-dom@19.2.0(react@19.2.0))(react@19.2.0)(use-sync-external-store@1.6.0(react@19.2.0))
       '@repo/db':
         specifier: workspace:^
         version: link:../../packages/db
@@ -68,6 +71,9 @@ importers:
       motia:
         specifier: 0.15.4-beta.169
         version: 0.15.4-beta.169(@types/node@24.10.1)(@types/react-dom@19.2.2(@types/react@19.2.2))(@types/react@19.2.2)(eslint@9.39.1(jiti@2.6.1))(lightningcss@1.30.2)(monaco-editor@0.55.1)(typescript@5.9.2)(use-sync-external-store@1.6.0(react@19.2.0))
+      redis:
+        specifier: ^5.0.0
+        version: 5.10.0
       zod:
         specifier: ^4.1.13
         version: 4.1.13
@@ -96,9 +102,6 @@ importers:
       '@hookform/resolvers':
         specifier: ^5.2.2
         version: 5.2.2(react-hook-form@7.67.0(react@19.2.0))
-      '@motiadev/stream-client-react':
-        specifier: 0.14.0-beta.164
-        version: 0.14.0-beta.164(react@19.2.0)
       '@prisma/client':
         specifier: ^7.0.1
         version: 7.0.1(prisma@7.0.1(@types/react@19.2.2)(react-dom@19.2.0(react@19.2.0))(react@19.2.0)(typescript@5.9.2))(typescript@5.9.2)
@@ -123,18 +126,6 @@ importers:
       '@tanstack/react-query':
         specifier: ^5.90.11
         version: 5.90.11(react@19.2.0)
-      '@trpc/client':
-        specifier: ^11.7.2
-        version: 11.7.2(@trpc/server@11.7.2(typescript@5.9.2))(typescript@5.9.2)
-      '@trpc/next':
-        specifier: ^11.7.2
-        version: 11.7.2(@tanstack/react-query@5.90.11(react@19.2.0))(@trpc/client@11.7.2(@trpc/server@11.7.2(typescript@5.9.2))(typescript@5.9.2))(@trpc/react-query@11.7.2(@tanstack/react-query@5.90.11(react@19.2.0))(@trpc/client@11.7.2(@trpc/server@11.7.2(typescript@5.9.2))(typescript@5.9.2))(@trpc/server@11.7.2(typescript@5.9.2))(react-dom@19.2.0(react@19.2.0))(react@19.2.0)(typescript@5.9.2))(@trpc/server@11.7.2(typescript@5.9.2))(next@15.5.7(@opentelemetry/api@1.9.0)(babel-plugin-react-compiler@1.0.0)(react-dom@19.2.0(react@19.2.0))(react@19.2.0))(react-dom@19.2.0(react@19.2.0))(react@19.2.0)(typescript@5.9.2)
-      '@trpc/react-query':
-        specifier: ^11.7.2
-        version: 11.7.2(@tanstack/react-query@5.90.11(react@19.2.0))(@trpc/client@11.7.2(@trpc/server@11.7.2(typescript@5.9.2))(typescript@5.9.2))(@trpc/server@11.7.2(typescript@5.9.2))(react-dom@19.2.0(react@19.2.0))(react@19.2.0)(typescript@5.9.2)
-      '@trpc/server':
-        specifier: ^11.7.2
-        version: 11.7.2(typescript@5.9.2)
       ai:
         specifier: ^5.0.106
         version: 5.0.106(zod@4.1.13)
@@ -1170,36 +1161,43 @@ packages:
       '@motiadev/core': 0.15.4-beta.169
       '@motiadev/ui': 0.15.4-beta.169
 
-  '@motiadev/stream-client-browser@0.14.0-beta.164':
-    resolution: {integrity: sha512-lAPuJ3TJ739xmqErmUFbdAZVtrIlHl1xlSc3thhVFHHeWSX+FM1YKwBkHhP9Ri79oHtwiEOYJEQxl1USYCW2oA==}
-
   '@motiadev/stream-client-browser@0.15.4-beta.169':
     resolution: {integrity: sha512-EivV1tjL3XeeEMa+ewxMZw1nhdj8g8eGPbdGrT8CM2gAmReDlrJovvQRfdXdF9lTlBECu4IIxftQ8i8mp7Q/lw==}
 
+  '@motiadev/stream-client-browser@0.17.14-beta.196':
+    resolution: {integrity: sha512-X2isevw/Jg7KALDa7MjWBQqWYvgyWdIqHgL4X1k5bX+nUDgeEYXk20H0sPpTRA5z37uXwoS9jqpFIFgIzpLm9A==}
+
   '@motiadev/stream-client-node@0.15.4-beta.169':
     resolution: {integrity: sha512-GGB65ItVS2gNycyZt/JpxPndR7IW7/SarycdjYDTZMnbu+qHdRMDEGA6SOOksCc107ipNjjm6c3UJAicI4CWaA==}
-
-  '@motiadev/stream-client-react@0.14.0-beta.164':
-    resolution: {integrity: sha512-LZcAKr0b+OxxIh5PkfkT8TZugXc+yNnjdVQkHieXFXFNmYMdkoQa2ee6qbJsWBYTaxexDmOj2Y/RQIWTTeoiNQ==}
-    peerDependencies:
-      react: ^19.1.0
 
   '@motiadev/stream-client-react@0.15.4-beta.169':
     resolution: {integrity: sha512-QyBr7g2VujYrUfjmu3mZ8Si0WH2FlJIEMrbmK0zBFBxISFkZtHs2E204ud7wqF82KBZhtwfE79+CSHhtr6yiPQ==}
     peerDependencies:
       react: ^19.1.0
 
-  '@motiadev/stream-client@0.14.0-beta.164':
-    resolution: {integrity: sha512-BpvoUmJ7SOfkR+aNW4DUxb3AY7jnI2v/O+CkkH+uyKMlSKDGvrwsPNuKLoE0xAgpcxj1+4i5prGgCDJDndl3Dg==}
+  '@motiadev/stream-client-react@0.17.14-beta.196':
+    resolution: {integrity: sha512-SJdAFRSgUE+vd9KyPYdW9isRIbya0xgV73eQ87Cbk+Hzfc3rW0jjH0YFHcFaArvBd0/sIus4j9+zp/oi3V8nxw==}
+    peerDependencies:
+      react: ^19.2.3
 
   '@motiadev/stream-client@0.15.4-beta.169':
     resolution: {integrity: sha512-egxV3SYy5mIZHpIqv/+BK6MS/BreGSuDWwEeBEtAQilBjzKFkdbsh0f6aLkUn7/NKYO0bmf+FH1lYjJtaLJu5w==}
+
+  '@motiadev/stream-client@0.17.14-beta.196':
+    resolution: {integrity: sha512-+P/Dpl6WndLi+OgW09hRNX2fLLfReh7EY9UQvbv9AMvpU/TxN2SkuJ4EBiX0CnMFquALs1MTtbi1HrlcVvZpgA==}
 
   '@motiadev/ui@0.15.4-beta.169':
     resolution: {integrity: sha512-RvGMkioFlYHntehr0RnNNsOPCSUd3Yf+gSb9Q/iGdN5h2Do1Hni/DzFsCMoeKje4/y/VrZGSrGBpttggKbIJ7w==}
     peerDependencies:
       react: ^19.1.0
       react-dom: ^19.1.0
+
+  '@motiadev/ui@0.17.14-beta.196':
+    resolution: {integrity: sha512-C/9FD0gPtHcHRQIvsMrgKnQ3rVddD4l5Wxqu4iEPDZXh/LRSyBlHI8v3ghjD6obDXY9ujxOi4I9Z6vaIyB6hWQ==}
+    peerDependencies:
+      lucide-react: ^0.555.0
+      react: ^19.2.3
+      react-dom: ^19.2.3
 
   '@motiadev/workbench@0.15.4-beta.169':
     resolution: {integrity: sha512-UZqUXLgVVYnCfrCvkcEQ3YGgW4DIrflrKP3FkelfC20XgiYOhNYiksutNCz9hrlIdKy96WadpytjPSOH93j3wQ==}
@@ -2041,44 +2039,6 @@ packages:
     resolution: {integrity: sha512-3uyzz01D1fkTLXuxF3JfoJoHQMU2fxsfJwE+6N5hHy0dVNoZOvwKP8Z2k7k1KDeD54N20apcJnG75TBAStIrBA==}
     peerDependencies:
       react: ^18 || ^19
-
-  '@trpc/client@11.7.2':
-    resolution: {integrity: sha512-OQxqUMfpDvjcszo9dbnqWQXnW2L5IbrKSz2H7l8s+mVM3EvYw7ztQ/gjFIN3iy0NcamiQfd4eE6qjcb9Lm+63A==}
-    peerDependencies:
-      '@trpc/server': 11.7.2
-      typescript: '>=5.7.2'
-
-  '@trpc/next@11.7.2':
-    resolution: {integrity: sha512-eZQeZag+/aJMxV6ucfyVdcgE7I6o88tldyBi+AFVCD8fPUjssRT7qOqR/THSaTLHjDl20Ok9gN0Sn1bmMEa+1w==}
-    peerDependencies:
-      '@tanstack/react-query': ^5.59.15
-      '@trpc/client': 11.7.2
-      '@trpc/react-query': 11.7.2
-      '@trpc/server': 11.7.2
-      next: '*'
-      react: '>=16.8.0'
-      react-dom: '>=16.8.0'
-      typescript: '>=5.7.2'
-    peerDependenciesMeta:
-      '@tanstack/react-query':
-        optional: true
-      '@trpc/react-query':
-        optional: true
-
-  '@trpc/react-query@11.7.2':
-    resolution: {integrity: sha512-IcLDMqx2mvlGRxkr0/m37TtPvRQ8nonITH3EwYv436x0Igx8eduR9z4tdgGBsjJY9e5W1G7cZ4zKCwrizSimFQ==}
-    peerDependencies:
-      '@tanstack/react-query': ^5.80.3
-      '@trpc/client': 11.7.2
-      '@trpc/server': 11.7.2
-      react: '>=18.2.0'
-      react-dom: '>=18.2.0'
-      typescript: '>=5.7.2'
-
-  '@trpc/server@11.7.2':
-    resolution: {integrity: sha512-AgB26PXY69sckherIhCacKLY49rxE2XP5h38vr/KMZTbLCL1p8IuIoKPjALTcugC2kbyQ7Lbqo2JDVfRSmPmfQ==}
-    peerDependencies:
-      typescript: '>=5.7.2'
 
   '@tsconfig/node10@1.0.12':
     resolution: {integrity: sha512-UCYBaeFvM11aU2y3YPZ//O5Rhj+xKyzy7mvcIoAjASbigy8mHMryP5cK7dgjlz2hWxh1g5pLw084E0a/wlUSFQ==}
@@ -5976,12 +5936,12 @@ snapshots:
       - typescript
       - utf-8-validate
 
-  '@motiadev/plugin-bullmq@0.15.4-beta.169(@motiadev/adapter-bullmq-events@0.15.4-beta.169(@motiadev/core@0.15.4-beta.169(@types/node@24.10.1)(redis@5.10.0)(typescript@5.9.2)))(@motiadev/core@0.15.4-beta.169(@types/node@24.10.1)(redis@5.10.0)(typescript@5.9.2))(@motiadev/stream-client-react@0.15.4-beta.169(react@19.2.0))(@motiadev/ui@0.15.4-beta.169(@types/react-dom@19.2.2(@types/react@19.2.2))(@types/react@19.2.2)(react-dom@19.2.0(react@19.2.0))(react@19.2.0)(use-sync-external-store@1.6.0(react@19.2.0)))(@types/react@19.2.2)(react@19.2.0)(use-sync-external-store@1.6.0(react@19.2.0))':
+  '@motiadev/plugin-bullmq@0.15.4-beta.169(@motiadev/adapter-bullmq-events@0.15.4-beta.169(@motiadev/core@0.15.4-beta.169(@types/node@24.10.1)(redis@5.10.0)(typescript@5.9.2)))(@motiadev/core@0.15.4-beta.169(@types/node@24.10.1)(redis@5.10.0)(typescript@5.9.2))(@motiadev/stream-client-react@0.17.14-beta.196(react@19.2.0))(@motiadev/ui@0.17.14-beta.196(@types/react-dom@19.2.2(@types/react@19.2.2))(@types/react@19.2.2)(lucide-react@0.555.0(react@19.2.0))(react-dom@19.2.0(react@19.2.0))(react@19.2.0)(use-sync-external-store@1.6.0(react@19.2.0)))(@types/react@19.2.2)(react@19.2.0)(use-sync-external-store@1.6.0(react@19.2.0))':
     dependencies:
       '@motiadev/adapter-bullmq-events': 0.15.4-beta.169(@motiadev/core@0.15.4-beta.169(@types/node@24.10.1)(redis@5.10.0)(typescript@5.9.2))
       '@motiadev/core': 0.15.4-beta.169(@types/node@24.10.1)(redis@5.10.0)(typescript@5.9.2)
-      '@motiadev/stream-client-react': 0.15.4-beta.169(react@19.2.0)
-      '@motiadev/ui': 0.15.4-beta.169(@types/react-dom@19.2.2(@types/react@19.2.2))(@types/react@19.2.2)(react-dom@19.2.0(react@19.2.0))(react@19.2.0)(use-sync-external-store@1.6.0(react@19.2.0))
+      '@motiadev/stream-client-react': 0.17.14-beta.196(react@19.2.0)
+      '@motiadev/ui': 0.17.14-beta.196(@types/react-dom@19.2.2(@types/react@19.2.2))(@types/react@19.2.2)(lucide-react@0.555.0(react@19.2.0))(react-dom@19.2.0(react@19.2.0))(react@19.2.0)(use-sync-external-store@1.6.0(react@19.2.0))
       '@tanstack/react-query': 5.90.11(react@19.2.0)
       bullmq: 5.65.1
       date-fns: 3.6.0
@@ -5996,12 +5956,12 @@ snapshots:
       - supports-color
       - use-sync-external-store
 
-  '@motiadev/plugin-endpoint@0.15.4-beta.169(@motiadev/core@0.15.4-beta.169(@types/node@24.10.1)(redis@5.10.0)(typescript@5.9.2))(@motiadev/stream-client-react@0.15.4-beta.169(react@19.2.0))(@motiadev/ui@0.15.4-beta.169(@types/react-dom@19.2.2(@types/react@19.2.2))(@types/react@19.2.2)(react-dom@19.2.0(react@19.2.0))(react@19.2.0)(use-sync-external-store@1.6.0(react@19.2.0)))(@types/react@19.2.2)(monaco-editor@0.55.1)(react-dom@19.2.0(react@19.2.0))(use-sync-external-store@1.6.0(react@19.2.0))':
+  '@motiadev/plugin-endpoint@0.15.4-beta.169(@motiadev/core@0.15.4-beta.169(@types/node@24.10.1)(redis@5.10.0)(typescript@5.9.2))(@motiadev/stream-client-react@0.17.14-beta.196(react@19.2.0))(@motiadev/ui@0.17.14-beta.196(@types/react-dom@19.2.2(@types/react@19.2.2))(@types/react@19.2.2)(lucide-react@0.555.0(react@19.2.0))(react-dom@19.2.0(react@19.2.0))(react@19.2.0)(use-sync-external-store@1.6.0(react@19.2.0)))(@types/react@19.2.2)(monaco-editor@0.55.1)(react-dom@19.2.0(react@19.2.0))(use-sync-external-store@1.6.0(react@19.2.0))':
     dependencies:
       '@monaco-editor/react': 4.7.0(monaco-editor@0.55.1)(react-dom@19.2.0(react@19.2.0))(react@19.2.0)
       '@motiadev/core': 0.15.4-beta.169(@types/node@24.10.1)(redis@5.10.0)(typescript@5.9.2)
-      '@motiadev/stream-client-react': 0.15.4-beta.169(react@19.2.0)
-      '@motiadev/ui': 0.15.4-beta.169(@types/react-dom@19.2.2(@types/react@19.2.2))(@types/react@19.2.2)(react-dom@19.2.0(react@19.2.0))(react@19.2.0)(use-sync-external-store@1.6.0(react@19.2.0))
+      '@motiadev/stream-client-react': 0.17.14-beta.196(react@19.2.0)
+      '@motiadev/ui': 0.17.14-beta.196(@types/react-dom@19.2.2(@types/react@19.2.2))(@types/react@19.2.2)(lucide-react@0.555.0(react@19.2.0))(react-dom@19.2.0(react@19.2.0))(react@19.2.0)(use-sync-external-store@1.6.0(react@19.2.0))
       clsx: 2.1.1
       json-schema: 0.4.0
       lucide-react: 0.555.0(react@19.2.0)
@@ -6017,11 +5977,11 @@ snapshots:
       - react-dom
       - use-sync-external-store
 
-  '@motiadev/plugin-logs@0.15.4-beta.169(@motiadev/core@0.15.4-beta.169(@types/node@24.10.1)(redis@5.10.0)(typescript@5.9.2))(@motiadev/stream-client-browser@0.15.4-beta.169)(@motiadev/ui@0.15.4-beta.169(@types/react-dom@19.2.2(@types/react@19.2.2))(@types/react@19.2.2)(react-dom@19.2.0(react@19.2.0))(react@19.2.0)(use-sync-external-store@1.6.0(react@19.2.0)))(@types/react@19.2.2)(use-sync-external-store@1.6.0(react@19.2.0))':
+  '@motiadev/plugin-logs@0.15.4-beta.169(@motiadev/core@0.15.4-beta.169(@types/node@24.10.1)(redis@5.10.0)(typescript@5.9.2))(@motiadev/stream-client-browser@0.17.14-beta.196)(@motiadev/ui@0.17.14-beta.196(@types/react-dom@19.2.2(@types/react@19.2.2))(@types/react@19.2.2)(lucide-react@0.555.0(react@19.2.0))(react-dom@19.2.0(react@19.2.0))(react@19.2.0)(use-sync-external-store@1.6.0(react@19.2.0)))(@types/react@19.2.2)(use-sync-external-store@1.6.0(react@19.2.0))':
     dependencies:
       '@motiadev/core': 0.15.4-beta.169(@types/node@24.10.1)(redis@5.10.0)(typescript@5.9.2)
-      '@motiadev/stream-client-browser': 0.15.4-beta.169
-      '@motiadev/ui': 0.15.4-beta.169(@types/react-dom@19.2.2(@types/react@19.2.2))(@types/react@19.2.2)(react-dom@19.2.0(react@19.2.0))(react@19.2.0)(use-sync-external-store@1.6.0(react@19.2.0))
+      '@motiadev/stream-client-browser': 0.17.14-beta.196
+      '@motiadev/ui': 0.17.14-beta.196(@types/react-dom@19.2.2(@types/react@19.2.2))(@types/react@19.2.2)(lucide-react@0.555.0(react@19.2.0))(react-dom@19.2.0(react@19.2.0))(react@19.2.0)(use-sync-external-store@1.6.0(react@19.2.0))
       lucide-react: 0.555.0(react@19.2.0)
       react: 19.2.0
       react18-json-view: 0.2.9(react@19.2.0)
@@ -6031,11 +5991,11 @@ snapshots:
       - immer
       - use-sync-external-store
 
-  '@motiadev/plugin-observability@0.15.4-beta.169(@motiadev/core@0.15.4-beta.169(@types/node@24.10.1)(redis@5.10.0)(typescript@5.9.2))(@motiadev/stream-client-react@0.15.4-beta.169(react@19.2.0))(@motiadev/ui@0.15.4-beta.169(@types/react-dom@19.2.2(@types/react@19.2.2))(@types/react@19.2.2)(react-dom@19.2.0(react@19.2.0))(react@19.2.0)(use-sync-external-store@1.6.0(react@19.2.0)))(@types/react-dom@19.2.2(@types/react@19.2.2))(@types/react@19.2.2)(react-dom@19.2.0(react@19.2.0))(use-sync-external-store@1.6.0(react@19.2.0))':
+  '@motiadev/plugin-observability@0.15.4-beta.169(@motiadev/core@0.15.4-beta.169(@types/node@24.10.1)(redis@5.10.0)(typescript@5.9.2))(@motiadev/stream-client-react@0.17.14-beta.196(react@19.2.0))(@motiadev/ui@0.17.14-beta.196(@types/react-dom@19.2.2(@types/react@19.2.2))(@types/react@19.2.2)(lucide-react@0.555.0(react@19.2.0))(react-dom@19.2.0(react@19.2.0))(react@19.2.0)(use-sync-external-store@1.6.0(react@19.2.0)))(@types/react-dom@19.2.2(@types/react@19.2.2))(@types/react@19.2.2)(react-dom@19.2.0(react@19.2.0))(use-sync-external-store@1.6.0(react@19.2.0))':
     dependencies:
       '@motiadev/core': 0.15.4-beta.169(@types/node@24.10.1)(redis@5.10.0)(typescript@5.9.2)
-      '@motiadev/stream-client-react': 0.15.4-beta.169(react@19.2.0)
-      '@motiadev/ui': 0.15.4-beta.169(@types/react-dom@19.2.2(@types/react@19.2.2))(@types/react@19.2.2)(react-dom@19.2.0(react@19.2.0))(react@19.2.0)(use-sync-external-store@1.6.0(react@19.2.0))
+      '@motiadev/stream-client-react': 0.17.14-beta.196(react@19.2.0)
+      '@motiadev/ui': 0.17.14-beta.196(@types/react-dom@19.2.2(@types/react@19.2.2))(@types/react@19.2.2)(lucide-react@0.555.0(react@19.2.0))(react-dom@19.2.0(react@19.2.0))(react@19.2.0)(use-sync-external-store@1.6.0(react@19.2.0))
       '@radix-ui/react-popover': 1.1.15(@types/react-dom@19.2.2(@types/react@19.2.2))(@types/react@19.2.2)(react-dom@19.2.0(react@19.2.0))(react@19.2.0)
       date-fns: 4.1.0
       lucide-react: 0.555.0(react@19.2.0)
@@ -6049,11 +6009,11 @@ snapshots:
       - react-dom
       - use-sync-external-store
 
-  '@motiadev/plugin-states@0.15.4-beta.169(@motiadev/core@0.15.4-beta.169(@types/node@24.10.1)(redis@5.10.0)(typescript@5.9.2))(@motiadev/ui@0.15.4-beta.169(@types/react-dom@19.2.2(@types/react@19.2.2))(@types/react@19.2.2)(react-dom@19.2.0(react@19.2.0))(react@19.2.0)(use-sync-external-store@1.6.0(react@19.2.0)))(@types/react@19.2.2)(monaco-editor@0.55.1)(react-dom@19.2.0(react@19.2.0))(react@19.2.0)(use-sync-external-store@1.6.0(react@19.2.0))':
+  '@motiadev/plugin-states@0.15.4-beta.169(@motiadev/core@0.15.4-beta.169(@types/node@24.10.1)(redis@5.10.0)(typescript@5.9.2))(@motiadev/ui@0.17.14-beta.196(@types/react-dom@19.2.2(@types/react@19.2.2))(@types/react@19.2.2)(lucide-react@0.555.0(react@19.2.0))(react-dom@19.2.0(react@19.2.0))(react@19.2.0)(use-sync-external-store@1.6.0(react@19.2.0)))(@types/react@19.2.2)(monaco-editor@0.55.1)(react-dom@19.2.0(react@19.2.0))(react@19.2.0)(use-sync-external-store@1.6.0(react@19.2.0))':
     dependencies:
       '@monaco-editor/react': 4.7.0(monaco-editor@0.55.1)(react-dom@19.2.0(react@19.2.0))(react@19.2.0)
       '@motiadev/core': 0.15.4-beta.169(@types/node@24.10.1)(redis@5.10.0)(typescript@5.9.2)
-      '@motiadev/ui': 0.15.4-beta.169(@types/react-dom@19.2.2(@types/react@19.2.2))(@types/react@19.2.2)(react-dom@19.2.0(react@19.2.0))(react@19.2.0)(use-sync-external-store@1.6.0(react@19.2.0))
+      '@motiadev/ui': 0.17.14-beta.196(@types/react-dom@19.2.2(@types/react@19.2.2))(@types/react@19.2.2)(lucide-react@0.555.0(react@19.2.0))(react-dom@19.2.0(react@19.2.0))(react@19.2.0)(use-sync-external-store@1.6.0(react@19.2.0))
       lucide-react: 0.555.0(react@19.2.0)
       react18-json-view: 0.2.9(react@19.2.0)
       zustand: 5.0.9(@types/react@19.2.2)(react@19.2.0)(use-sync-external-store@1.6.0(react@19.2.0))
@@ -6065,14 +6025,14 @@ snapshots:
       - react-dom
       - use-sync-external-store
 
-  '@motiadev/stream-client-browser@0.14.0-beta.164':
-    dependencies:
-      '@motiadev/stream-client': 0.14.0-beta.164
-      uuid: 11.1.0
-
   '@motiadev/stream-client-browser@0.15.4-beta.169':
     dependencies:
       '@motiadev/stream-client': 0.15.4-beta.169
+      uuid: 13.0.0
+
+  '@motiadev/stream-client-browser@0.17.14-beta.196':
+    dependencies:
+      '@motiadev/stream-client': 0.17.14-beta.196
       uuid: 13.0.0
 
   '@motiadev/stream-client-node@0.15.4-beta.169':
@@ -6084,25 +6044,50 @@ snapshots:
       - bufferutil
       - utf-8-validate
 
-  '@motiadev/stream-client-react@0.14.0-beta.164(react@19.2.0)':
-    dependencies:
-      '@motiadev/stream-client-browser': 0.14.0-beta.164
-      react: 19.2.0
-
   '@motiadev/stream-client-react@0.15.4-beta.169(react@19.2.0)':
     dependencies:
       '@motiadev/stream-client-browser': 0.15.4-beta.169
       react: 19.2.0
 
-  '@motiadev/stream-client@0.14.0-beta.164':
+  '@motiadev/stream-client-react@0.17.14-beta.196(react@19.2.0)':
     dependencies:
-      uuid: 11.1.0
+      '@motiadev/stream-client-browser': 0.17.14-beta.196
+      react: 19.2.0
 
   '@motiadev/stream-client@0.15.4-beta.169':
     dependencies:
       uuid: 13.0.0
 
+  '@motiadev/stream-client@0.17.14-beta.196':
+    dependencies:
+      uuid: 13.0.0
+
   '@motiadev/ui@0.15.4-beta.169(@types/react-dom@19.2.2(@types/react@19.2.2))(@types/react@19.2.2)(react-dom@19.2.0(react@19.2.0))(react@19.2.0)(use-sync-external-store@1.6.0(react@19.2.0))':
+    dependencies:
+      '@radix-ui/react-checkbox': 1.3.3(@types/react-dom@19.2.2(@types/react@19.2.2))(@types/react@19.2.2)(react-dom@19.2.0(react@19.2.0))(react@19.2.0)
+      '@radix-ui/react-dropdown-menu': 2.1.16(@types/react-dom@19.2.2(@types/react@19.2.2))(@types/react@19.2.2)(react-dom@19.2.0(react@19.2.0))(react@19.2.0)
+      '@radix-ui/react-label': 2.1.8(@types/react-dom@19.2.2(@types/react@19.2.2))(@types/react@19.2.2)(react-dom@19.2.0(react@19.2.0))(react@19.2.0)
+      '@radix-ui/react-select': 2.2.6(@types/react-dom@19.2.2(@types/react@19.2.2))(@types/react@19.2.2)(react-dom@19.2.0(react@19.2.0))(react@19.2.0)
+      '@radix-ui/react-separator': 1.1.8(@types/react-dom@19.2.2(@types/react@19.2.2))(@types/react@19.2.2)(react-dom@19.2.0(react@19.2.0))(react@19.2.0)
+      '@radix-ui/react-slot': 1.2.4(@types/react@19.2.2)(react@19.2.0)
+      '@radix-ui/react-tabs': 1.1.13(@types/react-dom@19.2.2(@types/react@19.2.2))(@types/react@19.2.2)(react-dom@19.2.0(react@19.2.0))(react@19.2.0)
+      '@radix-ui/react-tooltip': 1.2.8(@types/react-dom@19.2.2(@types/react@19.2.2))(@types/react@19.2.2)(react-dom@19.2.0(react@19.2.0))(react@19.2.0)
+      class-variance-authority: 0.7.1
+      clsx: 2.1.1
+      lucide-react: 0.555.0(react@19.2.0)
+      react: 19.2.0
+      react-dom: 19.2.0(react@19.2.0)
+      react-resizable-panels: 3.0.6(react-dom@19.2.0(react@19.2.0))(react@19.2.0)
+      react-use-resizable: 0.2.0(react@19.2.0)
+      tailwind-merge: 3.4.0
+      zustand: 5.0.9(@types/react@19.2.2)(react@19.2.0)(use-sync-external-store@1.6.0(react@19.2.0))
+    transitivePeerDependencies:
+      - '@types/react'
+      - '@types/react-dom'
+      - immer
+      - use-sync-external-store
+
+  '@motiadev/ui@0.17.14-beta.196(@types/react-dom@19.2.2(@types/react@19.2.2))(@types/react@19.2.2)(lucide-react@0.555.0(react@19.2.0))(react-dom@19.2.0(react@19.2.0))(react@19.2.0)(use-sync-external-store@1.6.0(react@19.2.0))':
     dependencies:
       '@radix-ui/react-checkbox': 1.3.3(@types/react-dom@19.2.2(@types/react@19.2.2))(@types/react@19.2.2)(react-dom@19.2.0(react@19.2.0))(react@19.2.0)
       '@radix-ui/react-dropdown-menu': 2.1.16(@types/react-dom@19.2.2(@types/react@19.2.2))(@types/react@19.2.2)(react-dom@19.2.0(react@19.2.0))(react@19.2.0)
@@ -6928,36 +6913,6 @@ snapshots:
     dependencies:
       '@tanstack/query-core': 5.90.11
       react: 19.2.0
-
-  '@trpc/client@11.7.2(@trpc/server@11.7.2(typescript@5.9.2))(typescript@5.9.2)':
-    dependencies:
-      '@trpc/server': 11.7.2(typescript@5.9.2)
-      typescript: 5.9.2
-
-  '@trpc/next@11.7.2(@tanstack/react-query@5.90.11(react@19.2.0))(@trpc/client@11.7.2(@trpc/server@11.7.2(typescript@5.9.2))(typescript@5.9.2))(@trpc/react-query@11.7.2(@tanstack/react-query@5.90.11(react@19.2.0))(@trpc/client@11.7.2(@trpc/server@11.7.2(typescript@5.9.2))(typescript@5.9.2))(@trpc/server@11.7.2(typescript@5.9.2))(react-dom@19.2.0(react@19.2.0))(react@19.2.0)(typescript@5.9.2))(@trpc/server@11.7.2(typescript@5.9.2))(next@15.5.7(@opentelemetry/api@1.9.0)(babel-plugin-react-compiler@1.0.0)(react-dom@19.2.0(react@19.2.0))(react@19.2.0))(react-dom@19.2.0(react@19.2.0))(react@19.2.0)(typescript@5.9.2)':
-    dependencies:
-      '@trpc/client': 11.7.2(@trpc/server@11.7.2(typescript@5.9.2))(typescript@5.9.2)
-      '@trpc/server': 11.7.2(typescript@5.9.2)
-      next: 15.5.7(@opentelemetry/api@1.9.0)(babel-plugin-react-compiler@1.0.0)(react-dom@19.2.0(react@19.2.0))(react@19.2.0)
-      react: 19.2.0
-      react-dom: 19.2.0(react@19.2.0)
-      typescript: 5.9.2
-    optionalDependencies:
-      '@tanstack/react-query': 5.90.11(react@19.2.0)
-      '@trpc/react-query': 11.7.2(@tanstack/react-query@5.90.11(react@19.2.0))(@trpc/client@11.7.2(@trpc/server@11.7.2(typescript@5.9.2))(typescript@5.9.2))(@trpc/server@11.7.2(typescript@5.9.2))(react-dom@19.2.0(react@19.2.0))(react@19.2.0)(typescript@5.9.2)
-
-  '@trpc/react-query@11.7.2(@tanstack/react-query@5.90.11(react@19.2.0))(@trpc/client@11.7.2(@trpc/server@11.7.2(typescript@5.9.2))(typescript@5.9.2))(@trpc/server@11.7.2(typescript@5.9.2))(react-dom@19.2.0(react@19.2.0))(react@19.2.0)(typescript@5.9.2)':
-    dependencies:
-      '@tanstack/react-query': 5.90.11(react@19.2.0)
-      '@trpc/client': 11.7.2(@trpc/server@11.7.2(typescript@5.9.2))(typescript@5.9.2)
-      '@trpc/server': 11.7.2(typescript@5.9.2)
-      react: 19.2.0
-      react-dom: 19.2.0(react@19.2.0)
-      typescript: 5.9.2
-
-  '@trpc/server@11.7.2(typescript@5.9.2)':
-    dependencies:
-      typescript: 5.9.2
 
   '@tsconfig/node10@1.0.12': {}
 
