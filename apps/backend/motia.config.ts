@@ -19,7 +19,12 @@ export default config({
     ),
   },
   app: (app) => {
-    // API key protection - all backend routes require valid X-API-Key
+    // Health check - no API key, for Docker/load balancer liveness
+    app.get("/health", (_req, res) => {
+      res.json({ status: "ok", ts: Date.now() });
+    });
+
+    // API key protection - all other routes require valid X-API-Key
     app.use(apiKeyMiddleware);
 
     // SSE endpoint for analysis task status (replaces WebSocket stream)
