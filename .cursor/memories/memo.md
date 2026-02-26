@@ -62,3 +62,13 @@ Purpose: capture solved problems, reusable fixes, and lessons learned.
 - Anti-pattern to avoid next time: keeping wrapper indirection longer than necessary once direct migration is safe.
 - Related bug log: `./debuglog.md#mod1-cleanup-001-residual-legacy-motia-references-outside-active-runtime-paths`
 - Related roadmap item: `./roadmap.md#module-1-hard-cutover-and-pruning`
+
+### 2026-02-26 - Frontend UI/UX baseline extraction and backend uv standardization
+- Context: needed to preserve current design behavior before deeper frontend adaptation while removing mixed backend package management paths.
+- What worked: documented concrete primitives, layout patterns, route-group UX flow, and status-feedback conventions from `frontend` into a dedicated memory artifact.
+- What failed: relying on default generated README/package-manager assumptions did not reflect current runtime reality.
+- Final fix: created `./frontend-ui-ux.md` and moved backend dependency management to `uv` via `backend/pyproject.toml` (removing `backend/requirements.txt` and `backend/package.json`).
+- Why it worked: creates a stable UX reference for Module 4 and a single Python package manager contract for backend execution.
+- Reuse guidance: for migration-phase UI work, snapshot current interaction/state conventions first; for Python services, keep install/run workflows centered on `uv sync` and `uv run`.
+- Anti-pattern to avoid next time: splitting backend dependency/runtime commands across `requirements.txt`, npm scripts, and ad-hoc Python invocations.
+- Related roadmap item: `./roadmap.md#module-4-frontend-adaptation-readability-and-ux-integration`

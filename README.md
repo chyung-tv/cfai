@@ -24,12 +24,15 @@ Temporary bridge directories still present for migration safety:
 ### Prerequisites
 
 - Node.js 18+
+- pnpm
 - Python 3.10+
+- uv
 
 ### Install
 
 ```bash
-npm install
+pnpm --dir frontend install
+uv sync --directory backend
 cp .env.example .env.local
 ```
 
@@ -37,10 +40,10 @@ cp .env.example .env.local
 
 ```bash
 # Frontend (primary)
-npm run dev
+pnpm --dir frontend dev
 
 # Backend (primary)
-npm run dev:backend
+uv run --directory backend uvicorn app.main:app --reload --host 0.0.0.0 --port 3001
 ```
 
 ### Service URLs

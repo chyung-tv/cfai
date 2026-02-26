@@ -21,6 +21,7 @@ Use this section as the live execution board.
 - Current owner: user + coding agent
 - Next acceptance checkpoint: resolve `MOD1-VAL-001` then verify end-to-end frontend->backend flow on primary runtime entries (post-migration path layout)
 - Blockers: see `./debuglog.md`
+- Supporting track (current session): extracted and documented frontend UI/UX baseline in `./frontend-ui-ux.md` and standardized backend package management onto `uv`.
 
 ### Session Briefing (for every new agent session)
 
@@ -32,9 +33,9 @@ Use this response order:
 
 Keep this block updated so agents can answer quickly:
 
-- Where we are at: Module 1 cutover is in progress with executable roots now physically aligned to `frontend` and `backend`.
-- What we need to implement next: finish validation pass after dependency installation and decide/execute remaining archival reference cleanup.
-- What we just implemented: migrated `apps/web` into `frontend`, deleted legacy-only `apps/backend`, and updated core docs/rules to reflect the new tree.
+- Where we are at: Module 1 cutover remains in progress with executable roots physically aligned to `frontend` and `backend`, plus a documented frontend UI/UX baseline for Module 4 implementation continuity.
+- What we need to implement next: resolve `MOD1-VAL-001`, run validation checks after dependency installation, and continue residual archival cleanup decisions.
+- What we just implemented: documented frontend design/UX conventions in memory and shifted backend dependency management to `uv` as the sole package manager.
 
 ### Execution Notes
 
