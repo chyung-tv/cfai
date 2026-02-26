@@ -40,3 +40,25 @@ Purpose: capture solved problems, reusable fixes, and lessons learned.
 - Why it worked: gives immediate context continuity before detailed planning.
 - Reuse guidance: keep `Session Briefing` in `roadmap.md` current after each meaningful change.
 - Anti-pattern to avoid next time: jumping into coding before status alignment and module planning.
+
+### 2026-02-26 - Pre-prune workflow capture before hard cutover
+- Context: needed to remove Motia runtime while preserving backend behavior knowledge for rewrite parity.
+- What worked: documented the full event chain, stream lifecycle, and persistence touchpoints before deletion.
+- What failed: relying on memory-only understanding of step sequencing.
+- Final fix: created `.cursor/memories/backend-analysis-workflow.md` as the baseline contract before pruning.
+- Why it worked: made destructive cleanup safer and gave a concrete parity checklist for FastAPI migration.
+- Reuse guidance: for any hard cutover, document trigger/transition/persistence semantics first, then prune.
+- Anti-pattern to avoid next time: deleting runtime artifacts before a durable behavioral spec exists.
+- Related bug log: `./debuglog.md#mod1-cleanup-001-residual-legacy-motia-references-outside-active-runtime-paths`
+- Related roadmap item: `./roadmap.md#module-1-hard-cutover-and-pruning`
+
+### 2026-02-26 - Physical executable-root migration
+- Context: after cutover refactors, repository still had app code under `apps/web` while target structure requires `/frontend` and `/backend`.
+- What worked: moved full web app tree into `frontend`, deleted legacy-only `apps/backend`, and corrected moved-path build schema references.
+- What failed: leaving old path assumptions in docs/debug notes caused drift.
+- Final fix: updated operational docs/rules/memory entries to reference `frontend` and `backend` as canonical roots.
+- Why it worked: eliminated structural ambiguity and made acceptance criteria verifiable at the filesystem level.
+- Reuse guidance: when restructuring roots, do physical moves early and immediately update docs/memory references in the same wave.
+- Anti-pattern to avoid next time: keeping wrapper indirection longer than necessary once direct migration is safe.
+- Related bug log: `./debuglog.md#mod1-cleanup-001-residual-legacy-motia-references-outside-active-runtime-paths`
+- Related roadmap item: `./roadmap.md#module-1-hard-cutover-and-pruning`

@@ -1,6 +1,7 @@
 {
   "name": "@repo/types",
   "version": "0.0.0",
+  "description": "Temporary migration bridge package. Expiry checkpoint: retire after frontend fully consumes backend-native contracts (Module 4).",
   "private": true,
   "exports": {
     ".": {

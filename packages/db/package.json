@@ -1,7 +1,7 @@
 {
   "name": "@repo/db",
   "version": "1.0.0",
-  "description": "",
+  "description": "Temporary migration bridge package. Expiry checkpoint: retire after Module 3/4 backend-owned data contract cutover.",
   "main": "db.ts",
   "scripts": {
     "postinstall": "prisma generate",

@@ -9,7 +9,7 @@ Use this section as the live execution board.
 
 ### Module Status
 
-- [ ] Module 1 - Hard Cutover and Pruning
+- [~] Module 1 - Hard Cutover and Pruning (in progress)
 - [ ] Module 2 - Containerized Runtime Foundation (Docker + PostgreSQL)
 - [ ] Module 3 - Backend Core (FastAPI Workflow, Auth, RBAC, Quota)
 - [ ] Module 4 - Frontend Adaptation (Readability and UX Integration)
@@ -17,9 +17,9 @@ Use this section as the live execution board.
 
 ### Current Focus
 
-- Active module: _TBD_
-- Current owner: _TBD_
-- Next acceptance checkpoint: _TBD_
+- Active module: Module 1 - Hard Cutover and Pruning
+- Current owner: user + coding agent
+- Next acceptance checkpoint: resolve `MOD1-VAL-001` then verify end-to-end frontend->backend flow on primary runtime entries (post-migration path layout)
 - Blockers: see `./debuglog.md`
 
 ### Session Briefing (for every new agent session)
@@ -32,9 +32,9 @@ Use this response order:
 
 Keep this block updated so agents can answer quickly:
 
-- Where we are at: `.cursor` memory/rules workflow is initialized.
-- What we need to implement next: start detailed execution planning for the active roadmap module.
-- What we just implemented: created `.cursor/memories` and `.cursor/rules`, migrated roadmap, and established always-on rules.
+- Where we are at: Module 1 cutover is in progress with executable roots now physically aligned to `frontend` and `backend`.
+- What we need to implement next: finish validation pass after dependency installation and decide/execute remaining archival reference cleanup.
+- What we just implemented: migrated `apps/web` into `frontend`, deleted legacy-only `apps/backend`, and updated core docs/rules to reflect the new tree.
 
 ### Execution Notes
 
