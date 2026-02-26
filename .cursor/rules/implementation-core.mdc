@@ -1,0 +1,19 @@
+---
+description: Core implementation rules for all agent tasks
+alwaysApply: true
+---
+
+# Implementation Core Rules
+
+1. At the start of each new session, read `.cursor/memories/roadmap.md` and provide status in this order:
+   - where we are at
+   - what we need to implement next
+   - what we just implemented
+2. After the status briefing, collaborate with the user on detailed module execution planning before coding non-trivial work.
+3. Keep changes focused and minimal. Avoid broad refactors unless required by active roadmap scope.
+4. Reuse existing project patterns/components before adding new abstractions.
+5. Do not silently change architecture decisions in the roadmap; document any justified deviation.
+6. Validate behavior after edits, but default to ephemeral checks:
+   - preferred: CLI runs, targeted commands, one-off temporary scripts
+   - avoid: creating persisted test files unless explicitly requested by user
+7. If validation is incomplete, clearly report what was not verified and why.

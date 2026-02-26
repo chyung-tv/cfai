@@ -1,0 +1,14 @@
+---
+description: Frontend and shared UI must prioritize shadcn and Tailwind
+alwaysApply: true
+---
+
+# Design System Rules
+
+Apply these rules whenever touching frontend or shared UI code (`apps/web`, `packages/ui`):
+
+1. Use shadcn as the primary component source before building custom UI primitives.
+2. Use Tailwind CSS as the primary styling system; avoid ad-hoc CSS when utilities or design tokens cover the need.
+3. Prefer composing existing shadcn components over creating new parallel component APIs.
+4. When implementing UI from references/specs, prioritize shadcn MCP/component sourcing workflow first.
+5. Keep frontend and shared UI visual behavior consistent by reusing the same patterns, spacing, and interaction states.

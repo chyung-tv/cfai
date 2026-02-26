@@ -1,0 +1,13 @@
+---
+description: Keep roadmap, debuglog, and memo updated during execution
+alwaysApply: true
+---
+
+# Memory Discipline Rules
+
+1. Treat `.cursor/memories/roadmap.md` as the single progress tracker.
+2. When starting or switching major tasks, update current focus and module status in roadmap memory.
+3. Keep the `Session Briefing` block in roadmap current so any new agent can report status immediately.
+4. For unresolved defects or blockers, log reproducible details in `.cursor/memories/debuglog.md`.
+5. When an issue is resolved, record reusable lessons in `.cursor/memories/memo.md`.
+6. Link entries across memories when relevant (roadmap <-> debuglog <-> memo) to preserve traceability.
