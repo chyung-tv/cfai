@@ -4,7 +4,10 @@ version = "0.1.0"
 description = "CFAI FastAPI backend"
 requires-python = ">=3.10"
 dependencies = [
+  "alembic",
+  "asyncpg",
   "fastapi",
+  "sqlalchemy[asyncio]",
   "uvicorn",
 ]
 

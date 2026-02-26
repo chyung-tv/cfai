@@ -1,60 +1,69 @@
 # CFAI
 
-CFAI is moving through a hard cutover from legacy Motia/NextAuth paths to a backend-authoritative frontend/backend split.
+CFAI is currently structured as a frontend/backend split:
+
+- `frontend/` - Next.js application
+- `backend/` - FastAPI service (managed with `uv`)
 
 ## Runtime Entry Points
 
-- `frontend/`: primary frontend executable boundary
-- `backend/`: primary backend executable boundary (FastAPI service on port 3001)
+- `frontend/` (port 3000)
+- `backend/` (port 3001)
 
-Temporary bridge directories still present for migration safety:
+## Current Delivery State
 
-- `packages/db`
-- `packages/types`
-
-## Current Module 1 State
-
-- Turborepo runtime orchestration removed from root scripts.
-- Motia runtime artifacts pruned and legacy backend folder removed.
-- Frontend no longer owns NextAuth or direct DB mutation paths.
-- Backend workflow logic was documented before pruning in `.cursor/memories/backend-analysis-workflow.md`.
+- Module 1 (Hard Cutover and Pruning) is closed.
+- Execution focus has shifted to:
+  - Module 2 runtime foundation (docker compose + async DB baseline)
+  - Module 4 frontend flow rebuild on the new scaffold baseline
 
 ## Quick Start
 
 ### Prerequisites
 
-- Node.js 18+
-- pnpm
-- Python 3.10+
-- uv
+- Docker + Docker Compose
+- (Optional host-side fallback) Node.js 18+, pnpm, Python 3.10+, uv
 
-### Install
+### Docker-First Dev (Recommended)
+
+```bash
+cp .env.example .env
+docker compose up --build
+```
+
+This starts:
+
+- frontend: `http://localhost:3000` (Next.js dev with bind-mounted source)
+- backend: `http://localhost:3001` (FastAPI uvicorn reload)
+- postgres: `localhost:5432`
+
+### Manual Migrations (Alembic)
+
+Migrations are intentionally manual (not auto-run on backend startup):
+
+```bash
+# Create a migration
+docker compose run --rm backend alembic revision --autogenerate -m "describe_change"
+
+# Apply latest migrations
+docker compose run --rm backend alembic upgrade head
+```
+
+### Host-Side Fallback (Without Docker)
 
 ```bash
 pnpm --dir frontend install
 uv sync --directory backend
-cp .env.example .env.local
-```
-
-### Run
-
-```bash
-# Frontend (primary)
 pnpm --dir frontend dev
-
-# Backend (primary)
 uv run --directory backend uvicorn app.main:app --reload --host 0.0.0.0 --port 3001
 ```
 
-### Service URLs
+## Notes
 
-- Frontend: `http://localhost:3000`
-- Backend: `http://localhost:3001`
-
-## Migration Notes
-
-- `packages/db` and `packages/types` are temporary bridges and must be retired after backend/domain contracts are fully moved.
-- Track progress and checkpoints in `.cursor/memories/roadmap.md`.
+- Frontend dependencies and scripts are managed with `pnpm` in `frontend/`.
+- Backend dependencies and runtime are managed with `uv` in `backend/`.
+- Backend DB stack uses async SQLAlchemy + Alembic.
+- Progress and module checkpoints live in `.cursor/memories/roadmap.md`.
 
 ## License
 

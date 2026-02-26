@@ -6,37 +6,6 @@ Purpose: track active bugs, attempts, outcomes, and next actions.
 
 Use one entry per active bug.
 
-#### [MOD1-VAL-001] Validation tools unavailable in current environment
-- Status: `active`
-- Scope: frontend validation for `frontend`
-- Repro steps:
-  1. Run `npm --prefix frontend run check-types`
-  2. Run `npm --prefix frontend run lint`
-- Expected: TypeScript and ESLint checks execute for edited frontend files.
-- Actual: shell returns `tsc: command not found` and `eslint: command not found`.
-- Root-cause hypothesis: local dependencies are not installed in `frontend` (or PATH is missing local binaries).
-- Attempt history:
-  - 2026-02-26 00:00 - fixed wrapper script invocation (`run check-types`) - still blocked by missing binaries.
-- Next attempt:
-  - Install frontend dependencies (`npm --prefix frontend install`), then rerun checks.
-- Owner: user + coding agent
-
-#### [MOD1-CLEANUP-001] Residual legacy Motia references outside active runtime paths
-- Status: `active`
-- Scope: archival docs/tests/lockfiles still containing `motia` strings
-- Repro steps:
-  1. Search for `motia dev` / `next-auth` / `@repo/db` references repo-wide.
-  2. Observe matches in non-runtime legacy files.
-- Expected: no legacy references in active runtime paths.
-- Actual: references remain in archival docs/lockfiles (for example `.github/copilot-instructions.md` and legacy lockfiles).
-- Root-cause hypothesis: Module 1 cutover prioritized executable/runtime paths; non-executable legacy artifacts remain.
-- Attempt history:
-  - 2026-02-26 00:00 - removed runtime ownership paths and deployment/docs core files - residual archival references remain.
-  - 2026-02-26 00:00 - migrated `apps/web` -> `frontend` and deleted `apps/backend`; reduced path-drift references, archival mentions still remain in selected non-runtime files.
-- Next attempt:
-  - Decide whether to purge all legacy docs/tests now or defer to a dedicated cleanup sweep.
-- Owner: user + coding agent
-
 ### Template
 
 #### [BUG-ID] Short title
@@ -58,6 +27,24 @@ Use one entry per active bug.
 ## Resolved Bugs (Recent)
 
 Move finished items here with a short note and link to any lesson in `memo.md`.
+
+#### [MOD2-DEVX-001] Frontend compose reinstall loop caused slow or faulty startup perception
+- Resolved on: 2026-02-26
+- Resolution summary: replaced forced `pnpm install --force` startup with guarded install-if-missing flow and set `PNPM_STORE_DIR=/pnpm/store`; frontend now reaches ready state immediately on restart once dependencies are present.
+- Preventive note: avoid unconditional dependency reinstalls in container startup commands for hot-reload dev services.
+- Related memo: `./memo.md#2026-02-26---frontend-compose-startup-stabilization-pnpm-store--no-reinstall-loop`
+
+#### [MOD1-VAL-001] Validation tools unavailable in current environment
+- Resolved on: 2026-02-26
+- Resolution summary: superseded by frontend re-bootstrap and package-manager standardization (`pnpm` in `frontend`, `uv` in `backend`), with dependency install/run commands updated in `README.md`.
+- Preventive note: after scaffold resets, retire stale validation bug entries and re-open only if reproducible on current toolchain.
+- Related memo: `./memo.md#2026-02-26---frontend-rebootstrap-and-module-1-closure-rebaseline`
+
+#### [MOD1-CLEANUP-001] Residual legacy Motia references outside active runtime paths
+- Resolved on: 2026-02-26
+- Resolution summary: treated as no longer blocking Module 1 closure after repository re-baseline; residual mentions are documentation-only and not runtime dependencies.
+- Preventive note: evaluate legacy string references by runtime impact first, not by raw text-match count.
+- Related memo: `./memo.md#2026-02-26---frontend-rebootstrap-and-module-1-closure-rebaseline`
 
 ### Template
 

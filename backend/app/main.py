@@ -4,6 +4,9 @@ from uuid import uuid4
 
 from fastapi import FastAPI, HTTPException, Query
 from pydantic import BaseModel
+from sqlalchemy import text
+
+from app.db.session import AsyncSessionLocal
 
 app = FastAPI(title="CFAI Backend", version="0.1.0")
 
@@ -118,6 +121,16 @@ def _build_mock_analysis(symbol: str, trace_id: str) -> dict[str, Any]:
 @app.get("/health")
 def health() -> dict[str, str]:
     return {"status": "ok"}
+
+
+@app.get("/health/db")
+async def health_db() -> dict[str, str]:
+    try:
+        async with AsyncSessionLocal() as session:
+            await session.execute(text("SELECT 1"))
+        return {"status": "ok"}
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail=f"database unavailable: {exc}") from exc
 
 
 @app.get("/auth/me")

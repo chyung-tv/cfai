@@ -9,7 +9,7 @@ Use this section as the live execution board.
 
 ### Module Status
 
-- [~] Module 1 - Hard Cutover and Pruning (in progress)
+- [x] Module 1 - Hard Cutover and Pruning (completed)
 - [ ] Module 2 - Containerized Runtime Foundation (Docker + PostgreSQL)
 - [ ] Module 3 - Backend Core (FastAPI Workflow, Auth, RBAC, Quota)
 - [ ] Module 4 - Frontend Adaptation (Readability and UX Integration)
@@ -17,11 +17,11 @@ Use this section as the live execution board.
 
 ### Current Focus
 
-- Active module: Module 1 - Hard Cutover and Pruning
+- Active module: Module 2 - Containerized Runtime Foundation (with Module 4 frontend re-bootstrap track)
 - Current owner: user + coding agent
-- Next acceptance checkpoint: resolve `MOD1-VAL-001` then verify end-to-end frontend->backend flow on primary runtime entries (post-migration path layout)
+- Next acceptance checkpoint: run and verify manual `alembic upgrade head` within compose flow, then lock acceptance evidence for Module 2.
 - Blockers: see `./debuglog.md`
-- Supporting track (current session): extracted and documented frontend UI/UX baseline in `./frontend-ui-ux.md` and standardized backend package management onto `uv`.
+- Supporting track (current session): compose startup UX fixed (no forced frontend reinstall), Docker-only restart path validated, and pnpm store behavior documented/contained via gitignore and volume store.
 
 ### Session Briefing (for every new agent session)
 
@@ -33,9 +33,9 @@ Use this response order:
 
 Keep this block updated so agents can answer quickly:
 
-- Where we are at: Module 1 cutover remains in progress with executable roots physically aligned to `frontend` and `backend`, plus a documented frontend UI/UX baseline for Module 4 implementation continuity.
-- What we need to implement next: resolve `MOD1-VAL-001`, run validation checks after dependency installation, and continue residual archival cleanup decisions.
-- What we just implemented: documented frontend design/UX conventions in memory and shifted backend dependency management to `uv` as the sole package manager.
+- Where we are at: Module 1 is complete and Module 2 implementation is active with stable Docker-first frontend/backend/postgres runtime and validated restart behavior.
+- What we need to implement next: finish/record manual Alembic migration execution evidence and continue backend feature migration on top of the new DB baseline.
+- What we just implemented: fixed frontend container startup to avoid reinstall-on-boot, verified service health endpoints after compose restarts, and clarified pnpm store strategy (`/pnpm/store` volume + `.pnpm-store` ignored).
 
 ### Execution Notes
 

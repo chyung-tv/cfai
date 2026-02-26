@@ -2,6 +2,7 @@
 
 # Node / frontend dependencies
 node_modules/
+.pnpm-store/
 .pnp
 .pnp.js
 .pnp.*

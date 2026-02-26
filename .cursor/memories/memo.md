@@ -72,3 +72,35 @@ Purpose: capture solved problems, reusable fixes, and lessons learned.
 - Reuse guidance: for migration-phase UI work, snapshot current interaction/state conventions first; for Python services, keep install/run workflows centered on `uv sync` and `uv run`.
 - Anti-pattern to avoid next time: splitting backend dependency/runtime commands across `requirements.txt`, npm scripts, and ad-hoc Python invocations.
 - Related roadmap item: `./roadmap.md#module-4-frontend-adaptation-readability-and-ux-integration`
+
+### 2026-02-26 - Frontend rebootstrap and Module 1 closure rebaseline
+- Context: frontend was re-scaffolded, invalidating parts of the previous migration narrative and active Module 1 bug context.
+- What worked: performed a criteria-first check (runtime dependency paths, executable boundaries, active manifests) before deciding module closure.
+- What failed: leaving old migration/bug wording in memories and README created planning drift after the reset.
+- Final fix: closed Module 1 in roadmap, moved Module 1 debug items to resolved, and refreshed README to match the new baseline.
+- Why it worked: re-aligned planning artifacts with the actual filesystem/runtime state, reducing false blockers.
+- Reuse guidance: after major scaffolding resets, immediately re-baseline roadmap/debug/docs before coding the next module.
+- Anti-pattern to avoid next time: carrying old module blockers forward without re-validating them against the new project shape.
+- Related bug log: `./debuglog.md#resolved-bugs-recent`
+- Related roadmap item: `./roadmap.md#module-2-containerized-runtime-foundation-docker--postgresql`
+
+### 2026-02-26 - Module 2 docker hot-reload and async migration baseline
+- Context: Module 2 required a strong local developer experience with frontend/backend bind mounts plus database migration discipline.
+- What worked: defined compose services for frontend/backend/postgres with named dependency volumes and reload commands, while keeping Alembic execution manual.
+- What failed: older env/docs assumed host-run only workflow and sync DB assumptions.
+- Final fix: introduced docker-first runbook, async SQLAlchemy session foundation, Alembic async env wiring, and an initial migration for `health_probes`.
+- Why it worked: aligned runtime, dependency management (`uv`), and schema evolution into one repeatable local workflow.
+- Reuse guidance: for new backend modules, add ORM models under `app/models`, then generate/apply migrations manually via compose one-off commands.
+- Anti-pattern to avoid next time: auto-running migrations on API start in shared dev environments.
+- Related roadmap item: `./roadmap.md#module-2-containerized-runtime-foundation-docker--postgresql`
+
+### 2026-02-26 - Frontend compose startup stabilization (pnpm store + no reinstall loop)
+- Context: frontend container appeared faulty after restarts because startup command reinstalled dependencies every boot and could stall on slow registry/network.
+- What worked: removed forced reinstall behavior and switched startup logic to install only when `node_modules` is absent.
+- What failed: `pnpm install --force` at startup caused repeated module recreation and delayed app readiness.
+- Final fix: updated compose env (`PNPM_STORE_DIR=/pnpm/store`) and command guard, confirmed restart readiness with frontend `200` and backend `/health` + `/health/db` status `ok`.
+- Why it worked: bind-mount hot reload stayed intact while dependency install became a one-time setup, dramatically improving restart DX.
+- Reuse guidance: for containerized JS dev servers, separate source bind mounts from dependency volume initialization and avoid forced reinstalls in steady state.
+- Anti-pattern to avoid next time: coupling every container boot to a full dependency reinstall.
+- Related bug log: `./debuglog.md#mod2-devx-001-frontend-compose-reinstall-loop-caused-slow-or-faulty-startup-perception`
+- Related roadmap item: `./roadmap.md#module-2-containerized-runtime-foundation-docker--postgresql`
