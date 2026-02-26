@@ -1,6 +1,6 @@
 # CFAI Roadmap and Progress Tracker
 
-Last updated: 2026-02-26
+Last updated: 2026-02-26 (Phase 3.3 documentation expansion)
 Source: migrated from `.cursor/roadmap.md`
 
 ## Progress Tracker
@@ -10,18 +10,18 @@ Use this section as the live execution board.
 ### Module Status
 
 - [x] Module 1 - Hard Cutover and Pruning (completed)
-- [ ] Module 2 - Containerized Runtime Foundation (Docker + PostgreSQL)
+- [x] Module 2 - Containerized Runtime Foundation (Docker + PostgreSQL) (completed)
 - [ ] Module 3 - Backend Core (FastAPI Workflow, Auth, RBAC, Quota)
 - [ ] Module 4 - Frontend Adaptation (Readability and UX Integration)
 - [ ] Module 5 - Phase 1 Completion Gate
 
 ### Current Focus
 
-- Active module: Module 2 - Containerized Runtime Foundation (with Module 4 frontend re-bootstrap track)
+- Active module: Module 3 - Backend Core (FastAPI Workflow, Auth, RBAC, Quota)
 - Current owner: user + coding agent
-- Next acceptance checkpoint: run and verify manual `alembic upgrade head` within compose flow, then lock acceptance evidence for Module 2.
+- Next acceptance checkpoint: complete Module 3.3 documentation expansion (linear node state machine + artifact persistence model), then implement nodes in phased order starting with resolver/deep-research/artifact-store foundations.
 - Blockers: see `./debuglog.md`
-- Supporting track (current session): compose startup UX fixed (no forced frontend reinstall), Docker-only restart path validated, and pnpm store behavior documented/contained via gitignore and volume store.
+- Supporting track (current session): documenting backend analysis redesign for Module 3.3 (ticker/company input, deep-research-first linear chain, thin workflow context, artifact-per-node persistence, and schema-TBD markers for rapid iteration).
 
 ### Session Briefing (for every new agent session)
 
@@ -33,9 +33,9 @@ Use this response order:
 
 Keep this block updated so agents can answer quickly:
 
-- Where we are at: Module 1 is complete and Module 2 implementation is active with stable Docker-first frontend/backend/postgres runtime and validated restart behavior.
-- What we need to implement next: finish/record manual Alembic migration execution evidence and continue backend feature migration on top of the new DB baseline.
-- What we just implemented: fixed frontend container startup to avoid reinstall-on-boot, verified service health endpoints after compose restarts, and clarified pnpm store strategy (`/pnpm/store` volume + `.pnpm-store` ignored).
+- Where we are at: Modules 1 and 2 are complete with a stable Docker-first frontend/backend/postgres runtime and verified compose migration path.
+- What we need to implement next: execute Module 3.3 phases in order (3.3A state/context contract, 3.3B node contracts, 3.3C persistence/cache schema, then implementation), keeping structured output schema explicitly TBD until stabilized.
+- What we just implemented: finalized Module 3.3 documentation plan decisions (strictly linear node chain, resolver ambiguity auto-pick policy, stock catalog + artifact store split, and Deep Research cost-control via cache-first reuse).
 
 ### Execution Notes
 
@@ -135,11 +135,110 @@ Goal: deliver the full Phase 1 backend capability behind stable APIs.
 
 - Coarse states:
   - `queued`, `running`, `completed`, `failed`, `cancelled`, `completed_cached`
-- Granular substates:
-  - `validate_input`, `resolve_cache`, `fetch_market_data`, `qualitative_analysis`,
-    `reverse_dcf`, `growth_judgement`, `dcf`, `rating`, `assemble_result`,
-    `persist_result`, `publish_sse`
+- v1 design constraint:
+  - keep execution strictly linear (no parallel branches) to simplify orchestration and failure semantics.
+- v1 linear substate sequence:
+  - `resolve_query` -> `deep_research` -> `structured_output` -> `reverse_dcf` ->
+    `audit_growth_likelihood` -> `advisor_decision` -> `persist_artifacts` -> `publish_sse`
+- Thin orchestration context contract:
+  - workflow context carries control-plane metadata and artifact references only.
+  - heavy payloads are persisted per-node in artifact storage and loaded by reference in downstream nodes.
 - Persist transitions in workflow tables and emit SSE from structured events.
+
+#### 3.3A) State Machine and Context Model
+
+- Input contract accepts both:
+  - ticker symbol (e.g., `AAPL`)
+  - company-name query (e.g., `Apple`)
+- Resolution strategy:
+  - hybrid lookup (external provider + local stock catalog cache)
+  - ambiguity policy: deterministic auto-pick best candidate in v1, while storing candidate list/confidence for observability.
+- Context handoff policy:
+  - pass `artifact_id`/`cache_key` references between nodes
+  - avoid large in-memory payload propagation
+
+#### 3.3B) Node-by-Node Responsibility Contracts
+
+- `resolve_query`:
+  - normalize user query and resolve canonical symbol/company identity.
+- `deep_research`:
+  - produce long-form research report (highest-latency, highest-cost node) and persist as artifact.
+- `structured_output`:
+  - extract/classify report into backend schema for downstream reasoning and rendering inputs.
+  - schema status: TBD (rapid iteration expected).
+- `reverse_dcf`:
+  - compute required growth matrix across discount-rate scenarios.
+- `auditor`:
+  - evaluate growth materialization likelihood from deep-research report + reverse-DCF outputs.
+- `advisor`:
+  - produce action/role/risk/tier recommendation from prior node outputs.
+- `persist_artifacts`:
+  - finalize artifact linkage + workflow summary payload for retrieval endpoints.
+
+#### 3.3C) Persistence, Cache, and Retrieval Design
+
+- Storage split:
+  - `analysis_workflow_events` = timeline/transition log (light payload only)
+  - `analysis_workflow_artifacts` = one row per node output artifact (heavy payload allowed)
+  - `stock_catalog` = canonical stock identity + resolver memory cache
+- Rationale:
+  - keep event queries fast and stable
+  - support artifact versioning/cache reuse independently from event retention
+- Cache policy (analysis artifacts):
+  - key by `symbol + input_hash + pipeline_version` (+ node/version dimensions where needed)
+  - freshness baseline: 7 days, with stricter policy for expensive deep-research artifacts if needed.
+
+#### 3.3D) Provider and Cost Strategy
+
+- Deep Research provider path:
+  - primary check: Pydantic AI pathway if it can cleanly invoke Gemini Deep Research Interactions.
+  - fallback/default: Google GenAI SDK using Interactions API (`deep-research-pro-preview-12-2025`).
+- Cost controls:
+  - cache-first behavior for deep-research artifacts
+  - use lower-cost/faster models for downstream structured nodes where precision profile allows.
+
+#### 3.3E) Failure Semantics and Observability
+
+- Define per-node error taxonomy and terminal mapping to `failed`.
+- Events must include machine-stable `state/substate` and concise diagnostic metadata.
+- Support partial rerun strategy from valid cached artifacts where upstream outputs are still fresh.
+- Structured output and selected artifact schemas remain TBD until design iteration stabilizes.
+
+#### 3.3F) Artifact Taxonomy and Cache-Key Contract
+
+- Canonical artifact types (v1):
+  - `query_resolution`
+  - `deep_research_report`
+  - `structured_output` (schema_tbd)
+  - `reverse_dcf_matrix`
+  - `auditor_assessment`
+  - `advisor_recommendation`
+  - `workflow_summary`
+- Artifact row contract (v1 baseline):
+  - one row per node output artifact
+  - required identity fields: `workflow_id`, `stock_id`, `artifact_type`, `artifact_version`, `cache_key`
+  - payload fields: `payload_json` and optional `payload_text` for long reports
+- Cache-key template (v1 baseline):
+  - `symbol + input_hash + pipeline_version + artifact_type + artifact_version`
+  - for deep research, include prompt/research profile version in `input_hash` derivation.
+
+#### 3.3G) Acceptance Criteria by Phase
+
+- 3.3A acceptance criteria:
+  - roadmap documents linear chain and canonical substate names.
+  - context contract explicitly limits handoff to references/metadata.
+- 3.3B acceptance criteria:
+  - each node has documented responsibility, expected inputs, expected outputs, and failure mode.
+  - structured output schema marked TBD with version placeholder.
+- 3.3C acceptance criteria:
+  - storage split is explicit (`events` timeline vs `artifacts` heavy payload vs `stock_catalog` identity).
+  - cache key and artifact versioning policy is documented.
+- 3.3D acceptance criteria:
+  - deep research provider path and fallback/default are documented.
+  - cost-control policy documents cache-first requirement for deep research.
+- 3.3E acceptance criteria:
+  - terminal failure mapping and required event diagnostics are documented.
+  - partial rerun behavior from valid cached artifacts is documented.
 
 ### 3.4 Persistence and Cache Submodule
 
@@ -148,11 +247,14 @@ Goal: deliver the full Phase 1 backend capability behind stable APIs.
   - `user_sessions`
   - `oauth_accounts`
   - `analysis_workflows`
-  - `analysis_workflow_events` (recommended)
-  - `stock_analysis_results`
+  - `analysis_workflow_events` (timeline + transitions)
+  - `analysis_workflow_artifacts` (node outputs, cacheable)
+  - `stock_catalog` (canonical symbol/company cache)
+  - `stock_analysis_results` (optional terminal projection table; TBD based on read-path needs)
 - Cache reuse policy:
   - lookup by `symbol + input_hash + pipeline_version`
-  - freshness window 7 days
+  - freshness window baseline 7 days
+  - deep-research artifacts should enforce cache-first reuse due to cost profile
 
 ### 3.5 RBAC and Quota Submodule
 

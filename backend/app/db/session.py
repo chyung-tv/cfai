@@ -1,15 +1,10 @@
-import os
 from collections.abc import AsyncGenerator
 
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
+from app.core.config import settings
 
-DATABASE_URL = os.getenv(
-    "DATABASE_URL",
-    "postgresql+asyncpg://cfai:cfai@localhost:5432/cfai",
-)
-
-engine = create_async_engine(DATABASE_URL, pool_pre_ping=True)
+engine = create_async_engine(settings.database_url, pool_pre_ping=True)
 
 AsyncSessionLocal = async_sessionmaker(
     engine,

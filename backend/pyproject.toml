@@ -7,7 +7,9 @@ dependencies = [
   "alembic",
   "asyncpg",
   "fastapi",
+  "httpx",
   "sqlalchemy[asyncio]",
+  "python-multipart",
   "uvicorn",
 ]
 
