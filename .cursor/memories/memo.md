@@ -45,7 +45,7 @@ Purpose: capture solved problems, reusable fixes, and lessons learned.
 - Context: needed to remove Motia runtime while preserving backend behavior knowledge for rewrite parity.
 - What worked: documented the full event chain, stream lifecycle, and persistence touchpoints before deletion.
 - What failed: relying on memory-only understanding of step sequencing.
-- Final fix: created `.cursor/memories/backend-analysis-workflow.md` as the baseline contract before pruning.
+- Final fix: captured backend workflow parity baseline and later integrated it into `./architecture.md` as durable architecture context.
 - Why it worked: made destructive cleanup safer and gave a concrete parity checklist for FastAPI migration.
 - Reuse guidance: for any hard cutover, document trigger/transition/persistence semantics first, then prune.
 - Anti-pattern to avoid next time: deleting runtime artifacts before a durable behavioral spec exists.
@@ -67,7 +67,7 @@ Purpose: capture solved problems, reusable fixes, and lessons learned.
 - Context: needed to preserve current design behavior before deeper frontend adaptation while removing mixed backend package management paths.
 - What worked: documented concrete primitives, layout patterns, route-group UX flow, and status-feedback conventions from `frontend` into a dedicated memory artifact.
 - What failed: relying on default generated README/package-manager assumptions did not reflect current runtime reality.
-- Final fix: created `./frontend-ui-ux.md` and moved backend dependency management to `uv` via `backend/pyproject.toml` (removing `backend/requirements.txt` and `backend/package.json`).
+- Final fix: documented frontend UI/UX baseline and moved backend dependency management to `uv` via `backend/pyproject.toml` (removing `backend/requirements.txt` and `backend/package.json`); the UI/UX baseline is now integrated into `./architecture.md`.
 - Why it worked: creates a stable UX reference for Module 4 and a single Python package manager contract for backend execution.
 - Reuse guidance: for migration-phase UI work, snapshot current interaction/state conventions first; for Python services, keep install/run workflows centered on `uv sync` and `uv run`.
 - Anti-pattern to avoid next time: splitting backend dependency/runtime commands across `requirements.txt`, npm scripts, and ad-hoc Python invocations.

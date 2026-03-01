@@ -1,5 +1,5 @@
 ---
-description: Keep roadmap, debuglog, and memo updated during execution
+description: Keep roadmap, architecture, decisions, debuglog, and memo aligned
 alwaysApply: true
 ---
 
@@ -7,7 +7,9 @@ alwaysApply: true
 
 1. Treat `.cursor/memories/roadmap.md` as the single progress tracker.
 2. When starting or switching major tasks, update current focus and module status in roadmap memory.
-3. Keep the `Session Briefing` block in roadmap current so any new agent can report status immediately.
-4. For unresolved defects or blockers, log reproducible details in `.cursor/memories/debuglog.md`.
-5. When an issue is resolved, record reusable lessons in `.cursor/memories/memo.md`.
-6. Link entries across memories when relevant (roadmap <-> debuglog <-> memo) to preserve traceability.
+3. Treat `.cursor/memories/architecture.md` as the latest agreed architecture snapshot (target system shape).
+4. Treat `.cursor/memories/architecture-decisions.md` as the architecture decision log (rationale and tradeoffs).
+5. Keep the `Session Briefing` block in roadmap current so any new agent can report status immediately.
+6. For unresolved defects or blockers, log reproducible details in `.cursor/memories/debuglog.md`.
+7. When an issue is resolved, record reusable lessons in `.cursor/memories/memo.md`.
+8. Link entries across memories when relevant (roadmap <-> architecture <-> architecture-decisions <-> debuglog <-> memo) to preserve traceability.

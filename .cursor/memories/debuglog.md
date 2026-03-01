@@ -46,10 +46,3 @@ Move finished items here with a short note and link to any lesson in `memo.md`.
 - Preventive note: evaluate legacy string references by runtime impact first, not by raw text-match count.
 - Related memo: `./memo.md#2026-02-26---frontend-rebootstrap-and-module-1-closure-rebaseline`
 
-### Template
-
-#### [BUG-ID] Short title
-- Resolved on:
-- Resolution summary:
-- Preventive note:
-- Related memo: `./memo.md#...`
