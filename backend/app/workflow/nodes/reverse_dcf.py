@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from statistics import median
@@ -7,6 +8,7 @@ from typing import Any
 
 from app.providers.fmp_client import FmpClient, FmpClientError
 from app.workflow.base_node import BaseNode
+from app.workflow.context import WorkflowContext
 
 
 @dataclass(frozen=True)
@@ -42,7 +44,7 @@ class ReverseDcfNode(BaseNode):
     def __init__(self, fmp_client: FmpClient) -> None:
         self._fmp_client = fmp_client
 
-    async def run(self, context: dict) -> dict:
+    async def run(self, context: WorkflowContext) -> dict:
         symbol = str(context.get("symbol", "")).strip().upper()
         if not symbol:
             raise ValueError("symbol is required")
@@ -52,34 +54,45 @@ class ReverseDcfNode(BaseNode):
             result = {"id": context.get("workflow_id"), "symbol": symbol}
 
         try:
-            quote_call = await self._fmp_client.fetch_quote(symbol)
-            profile_call = await self._fmp_client.fetch_profile_by_symbol(symbol)
-            quarter_income_call = await self._fmp_client.fetch_income_statement(
-                symbol,
-                period="quarter",
-                limit=4,
-            )
-            quarter_cash_flow_call = await self._fmp_client.fetch_cash_flow_statement(
-                symbol,
-                period="quarter",
-                limit=4,
-            )
-            quarter_balance_call = await self._fmp_client.fetch_balance_sheet_statement(
-                symbol,
-                period="quarter",
-                limit=1,
-            )
-            annual_income_call = await self._fmp_client.fetch_income_statement(
-                symbol,
-                limit=1,
-            )
-            annual_cash_flow_call = await self._fmp_client.fetch_cash_flow_statement(
-                symbol,
-                limit=1,
-            )
-            annual_balance_call = await self._fmp_client.fetch_balance_sheet_statement(
-                symbol,
-                limit=1,
+            (
+                quote_call,
+                profile_call,
+                quarter_income_call,
+                quarter_cash_flow_call,
+                quarter_balance_call,
+                annual_income_call,
+                annual_cash_flow_call,
+                annual_balance_call,
+            ) = await asyncio.gather(
+                self._fmp_client.fetch_quote(symbol),
+                self._fmp_client.fetch_profile_by_symbol(symbol),
+                self._fmp_client.fetch_income_statement(
+                    symbol,
+                    period="quarter",
+                    limit=4,
+                ),
+                self._fmp_client.fetch_cash_flow_statement(
+                    symbol,
+                    period="quarter",
+                    limit=4,
+                ),
+                self._fmp_client.fetch_balance_sheet_statement(
+                    symbol,
+                    period="quarter",
+                    limit=1,
+                ),
+                self._fmp_client.fetch_income_statement(
+                    symbol,
+                    limit=1,
+                ),
+                self._fmp_client.fetch_cash_flow_statement(
+                    symbol,
+                    limit=1,
+                ),
+                self._fmp_client.fetch_balance_sheet_statement(
+                    symbol,
+                    limit=1,
+                ),
             )
         except FmpClientError as exc:
             raise RuntimeError(f"reverse_dcf_fmp_{exc.code}: {exc}") from exc

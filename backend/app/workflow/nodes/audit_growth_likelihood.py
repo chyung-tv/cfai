@@ -9,6 +9,7 @@ from app.providers.gemini_deep_research import (
     GeminiDeepResearchClient,
 )
 from app.workflow.base_node import BaseNode
+from app.workflow.context import WorkflowContext
 from app.workflow.prompts.audit_growth_likelihood_prompt import (
     build_audit_growth_likelihood_prompt,
 )
@@ -77,7 +78,7 @@ class AuditGrowthLikelihoodNode(BaseNode):
     def __init__(self, client: GeminiDeepResearchClient) -> None:
         self._client = client
 
-    async def run(self, context: dict) -> dict:
+    async def run(self, context: WorkflowContext) -> dict:
         result = context.get("result")
         if not isinstance(result, dict):
             raise ValueError("result payload is required")

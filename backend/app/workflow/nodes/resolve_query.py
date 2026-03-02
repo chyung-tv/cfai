@@ -5,12 +5,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.stock_catalog import StockCatalog
 from app.workflow.base_node import BaseNode
+from app.workflow.context import WorkflowContext
 
 
 class ResolveQueryNode(BaseNode):
     name = "resolve_query"
 
-    async def run(self, context: dict) -> dict:
+    async def run(self, context: WorkflowContext) -> dict:
         symbol = str(context.get("symbol", "")).strip().upper()
         if not symbol:
             raise ValueError("symbol is required")

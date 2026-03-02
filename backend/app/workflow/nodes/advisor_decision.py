@@ -6,6 +6,7 @@ from pydantic import BaseModel, Field, ValidationError, field_validator, model_v
 
 from app.providers.advisor_client import AdvisorClient
 from app.workflow.base_node import BaseNode
+from app.workflow.context import WorkflowContext
 from app.workflow.prompts.advisor_decision_prompt import build_advisor_decision_prompt
 
 
@@ -78,7 +79,7 @@ class AdvisorDecisionNode(BaseNode):
     def __init__(self, client: AdvisorClient) -> None:
         self._client = client
 
-    async def run(self, context: dict) -> dict:
+    async def run(self, context: WorkflowContext) -> dict:
         result = context.get("result")
         if not isinstance(result, dict):
             raise ValueError("result payload is required")

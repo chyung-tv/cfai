@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
@@ -31,6 +31,23 @@ type ProfileItem = {
   }>;
 };
 
+type WorkflowState =
+  | "queued"
+  | "running"
+  | "completed"
+  | "failed"
+  | "cancelled"
+  | "completed_cached";
+
+type WorkflowEvent = {
+  id: string;
+  symbol: string;
+  state: WorkflowState;
+  substate: string | null;
+  message: string | null;
+  payload: Record<string, unknown> | null;
+};
+
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL ?? "http://localhost:3001";
 
 function pretty(value: unknown): string {
@@ -58,8 +75,12 @@ function titleize(value: string) {
 export default function AnalysisDemoPage() {
   const [symbol, setSymbol] = useState("AMD");
   const [loading, setLoading] = useState(false);
+  const [triggering, setTriggering] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [payload, setPayload] = useState<JsonObject | null>(null);
+  const [traceId, setTraceId] = useState<string | null>(null);
+  const [liveEvents, setLiveEvents] = useState<WorkflowEvent[]>([]);
+  const eventSourceRef = useRef<EventSource | null>(null);
 
   const structuredOutput = useMemo(
     () => (payload?.structuredOutput as JsonObject | undefined) ?? null,
@@ -105,6 +126,7 @@ export default function AnalysisDemoPage() {
     try {
       const response = await fetch(
         `${BACKEND_URL}/analysis/latest?symbol=${encodeURIComponent(normalized)}`,
+        { credentials: "include" },
       );
       if (!response.ok) {
         throw new Error(`Backend returned status ${response.status}`);
@@ -125,13 +147,83 @@ export default function AnalysisDemoPage() {
     }
   }
 
+  function closeEventSource() {
+    if (eventSourceRef.current) {
+      eventSourceRef.current.close();
+      eventSourceRef.current = null;
+    }
+  }
+
+  async function triggerAnalysis() {
+    const normalized = symbol.trim().toUpperCase();
+    if (!normalized) {
+      setError("Enter a symbol.");
+      return;
+    }
+    closeEventSource();
+    setTriggering(true);
+    setError(null);
+    setPayload(null);
+    setLiveEvents([]);
+    setTraceId(null);
+    try {
+      const response = await fetch(`${BACKEND_URL}/analysis/trigger`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ symbol: normalized }),
+      });
+      if (!response.ok) {
+        throw new Error(`Trigger failed with status ${response.status}`);
+      }
+      const data = (await response.json()) as { traceId?: string };
+      if (!data.traceId) {
+        throw new Error("Trigger response did not include traceId");
+      }
+      setTraceId(data.traceId);
+      const source = new EventSource(
+        `${BACKEND_URL}/analysis/events/stream?traceId=${encodeURIComponent(data.traceId)}`,
+        { withCredentials: true },
+      );
+      eventSourceRef.current = source;
+      source.onmessage = async (event) => {
+        try {
+          const parsed = JSON.parse(event.data) as WorkflowEvent;
+          setLiveEvents((prev) => [parsed, ...prev].slice(0, 50));
+          if (parsed.state === "completed" || parsed.state === "completed_cached") {
+            closeEventSource();
+            await loadLatestAnalysis();
+          } else if (parsed.state === "failed" || parsed.state === "cancelled") {
+            closeEventSource();
+          }
+        } catch {
+          // Ignore malformed SSE payloads and keep stream open.
+        }
+      };
+      source.onerror = () => {
+        closeEventSource();
+      };
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Unknown trigger error";
+      setError(message);
+    } finally {
+      setTriggering(false);
+    }
+  }
+
+  useEffect(() => {
+    return () => {
+      closeEventSource();
+    };
+  }, []);
+
   return (
     <main className="min-h-screen bg-zinc-50 p-6 text-zinc-900 dark:bg-zinc-950 dark:text-zinc-100">
       <div className="mx-auto flex w-full max-w-6xl flex-col gap-6">
         <header className="flex flex-col gap-3 rounded-xl border border-zinc-200 bg-white p-5 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
           <h1 className="text-2xl font-semibold">Analysis Demo</h1>
           <p className="text-sm text-zinc-600 dark:text-zinc-400">
-            Reads persisted DB payload from <code>/analysis/latest</code>. No workflow trigger and no deep-research rerun.
+            Trigger + SSE progress + final payload read from <code>/analysis/latest</code>.
           </p>
           <div className="flex flex-wrap gap-2">
             <input
@@ -142,12 +234,34 @@ export default function AnalysisDemoPage() {
             />
             <button
               className="rounded bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-700 disabled:opacity-60 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-300"
+              onClick={triggerAnalysis}
+              disabled={triggering}
+            >
+              {triggering ? "Triggering..." : "Trigger Workflow"}
+            </button>
+            <button
+              className="rounded bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-700 disabled:opacity-60 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-300"
               onClick={loadLatestAnalysis}
               disabled={loading}
             >
               {loading ? "Loading..." : "Load from DB"}
             </button>
           </div>
+          {traceId ? (
+            <p className="text-xs text-zinc-600 dark:text-zinc-400">
+              traceId: <code>{traceId}</code>
+            </p>
+          ) : null}
+          {liveEvents.length > 0 ? (
+            <div className="max-h-40 overflow-auto rounded border border-zinc-200 p-2 text-xs dark:border-zinc-800">
+              {liveEvents.map((item, idx) => (
+                <p key={`${item.id}-${item.state}-${item.substate ?? "none"}-${idx}`}>
+                  [{item.state}
+                  {item.substate ? `/${item.substate}` : ""}] {item.message ?? ""}
+                </p>
+              ))}
+            </div>
+          ) : null}
           {error ? <p className="text-sm text-red-600 dark:text-red-400">{error}</p> : null}
         </header>
 

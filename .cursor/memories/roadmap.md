@@ -19,7 +19,7 @@ Purpose: execution tracker only (progress, sequencing, checkpoints, acceptance).
 
 - Active module: Module 3 - Backend Core
 - Current owner: user + coding agent
-- Next acceptance checkpoint: finalize strict trigger/access contracts, then implement `persist_artifacts` to close the workflow pipeline.
+- Next acceptance checkpoint: validate typed workflow context + artifact persistence + SSE/FE trigger integration with a full MPWR run.
 - Blockers: see `./debuglog.md`
 
 ### Session Briefing (for every new agent session)
@@ -33,8 +33,8 @@ Use this response order:
 Keep this block updated:
 
 - Where we are at: Modules 1 and 2 are complete with stable Docker-first frontend/backend/postgres runtime.
-- What we need to implement next: complete strict trigger/access split (lookup + result-access + trigger), then implement `persist_artifacts` and finalize completion path.
-- What we just implemented: reached a satisfactory workflow prototype with DB-backed demo rendering, fixed structured output UI shape, reverse DCF/audit/advisor integration, and profile-by-case advisor matrix semantics.
+- What we need to implement next: harden persistence/read contracts with artifact endpoints/read-model shaping and complete Module 3 acceptance verification.
+- What we just implemented: added typed workflow context scaffolding, artifact table persistence hooks in orchestrator, lighter SSE completion payload semantics, reverse DCF parallel provider I/O, FE trigger+SSE+final-read demo path, and validated an MPWR end-to-end run with a single deep_research attempt.
 
 ### Execution Notes
 

@@ -7,6 +7,7 @@ from app.providers.gemini_deep_research import (
     GeminiDeepResearchClient,
 )
 from app.workflow.base_node import BaseNode
+from app.workflow.context import WorkflowContext
 from app.workflow.prompts.structured_output_prompt import build_structured_output_prompt
 from app.workflow.schemas.structured_output import StructuredOutputModel
 
@@ -18,7 +19,7 @@ class StructuredOutputNode(BaseNode):
     def __init__(self, client: GeminiDeepResearchClient) -> None:
         self._client = client
 
-    async def run(self, context: dict) -> dict:
+    async def run(self, context: WorkflowContext) -> dict:
         result = context.get("result")
         if not isinstance(result, dict):
             raise ValueError("deep research result is missing")

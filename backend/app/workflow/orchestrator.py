@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import copy
 from typing import Any
 from uuid import uuid4
 
@@ -8,10 +9,12 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.analysis_workflow import AnalysisWorkflow
+from app.models.analysis_workflow_artifact import AnalysisWorkflowArtifact
 from app.models.analysis_workflow_event import AnalysisWorkflowEvent
 from app.providers.advisor_client import AdvisorClient
 from app.providers.fmp_client import FmpClient
 from app.providers.gemini_deep_research import GeminiDeepResearchClient
+from app.workflow.context import WorkflowContext
 from app.workflow.nodes.advisor_decision import AdvisorDecisionNode
 from app.workflow.nodes.audit_growth_likelihood import AuditGrowthLikelihoodNode
 from app.workflow.nodes.deep_research import DeepResearchNode
@@ -86,7 +89,7 @@ class WorkflowOrchestrator:
             if workflow is None:
                 return
 
-            context: dict[str, Any] = {
+            context: WorkflowContext = {
                 "workflow_id": workflow.id,
                 "symbol": workflow.symbol,
                 "force_refresh": workflow.force_refresh,
@@ -128,9 +131,18 @@ class WorkflowOrchestrator:
                         WorkflowState.completed_cached,
                         "resolve_cache",
                         "Completed from cache",
-                        {"result": context.get("cached_result")},
+                        {"cacheHit": True},
                     )
-                    workflow.result_payload = context.get("cached_result")
+                    cached_result = context.get("cached_result")
+                    if isinstance(cached_result, dict):
+                        workflow.result_payload = copy.deepcopy(cached_result)
+                        await self._persist_artifact(
+                            db,
+                            workflow.id,
+                            "final_result",
+                            cached_result,
+                            artifact_version="v1-cached",
+                        )
                     await db.commit()
                     return
 
@@ -142,6 +154,14 @@ class WorkflowOrchestrator:
                     "Running deep research analysis",
                 )
                 await DeepResearchNode(self._deep_research_client).execute(context)
+                deep_research_result = context.get("result")
+                if isinstance(deep_research_result, dict):
+                    await self._persist_artifact(
+                        db,
+                        workflow.id,
+                        "deep_research",
+                        deep_research_result,
+                    )
 
                 await self._emit(
                     db,
@@ -151,7 +171,13 @@ class WorkflowOrchestrator:
                     "Structuring deep research output",
                 )
                 output = await StructuredOutputNode(self._deep_research_client).execute(context)
-                workflow.result_payload = output["result"]
+                workflow.result_payload = copy.deepcopy(output["result"])
+                await self._persist_artifact(
+                    db,
+                    workflow.id,
+                    "structured_output",
+                    output["structuredOutput"],
+                )
                 await db.commit()
 
                 await self._emit(
@@ -162,7 +188,13 @@ class WorkflowOrchestrator:
                     "Running reverse DCF calculation",
                 )
                 output = await ReverseDcfNode(self._fmp_client).execute(context)
-                workflow.result_payload = output["result"]
+                workflow.result_payload = copy.deepcopy(output["result"])
+                await self._persist_artifact(
+                    db,
+                    workflow.id,
+                    "reverse_dcf",
+                    output["reverseDcf"],
+                )
                 await db.commit()
 
                 await self._emit(
@@ -173,7 +205,13 @@ class WorkflowOrchestrator:
                     "Auditing growth likelihood against deep research evidence",
                 )
                 output = await AuditGrowthLikelihoodNode(self._deep_research_client).execute(context)
-                workflow.result_payload = output["result"]
+                workflow.result_payload = copy.deepcopy(output["result"])
+                await self._persist_artifact(
+                    db,
+                    workflow.id,
+                    "audit_growth_likelihood",
+                    output["auditGrowthLikelihood"],
+                )
                 await db.commit()
 
                 await self._emit(
@@ -184,7 +222,13 @@ class WorkflowOrchestrator:
                     "Generating investor-profile advisor actions",
                 )
                 output = await AdvisorDecisionNode(self._advisor_client).execute(context)
-                workflow.result_payload = output["result"]
+                workflow.result_payload = copy.deepcopy(output["result"])
+                await self._persist_artifact(
+                    db,
+                    workflow.id,
+                    "advisor_decision",
+                    output["advisorDecision"],
+                )
                 await db.commit()
 
                 await self._emit(
@@ -202,7 +246,7 @@ class WorkflowOrchestrator:
                     WorkflowState.completed,
                     "completed",
                     "Analysis completed",
-                    {"result": workflow.result_payload},
+                    {"hasResult": workflow.result_payload is not None},
                 )
             except Exception as exc:
                 workflow.error_message = str(exc)
@@ -244,6 +288,23 @@ class WorkflowOrchestrator:
                 state=state,
                 substate=substate,
                 message=message,
+                payload=payload,
+            )
+        )
+
+    async def _persist_artifact(
+        self,
+        db: AsyncSession,
+        workflow_id: str,
+        artifact_type: str,
+        payload: dict[str, Any],
+        artifact_version: str = "v1",
+    ) -> None:
+        db.add(
+            AnalysisWorkflowArtifact(
+                workflow_id=workflow_id,
+                artifact_type=artifact_type,
+                artifact_version=artifact_version,
                 payload=payload,
             )
         )
