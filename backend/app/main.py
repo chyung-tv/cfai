@@ -1,9 +1,11 @@
 from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text
 
 from app.core.config import settings
 from app.db.session import AsyncSessionLocal
 from app.maintenance.seed_service import CatalogSeedService
+from app.providers.advisor_client import AdvisorClient
 from app.providers.fmp_client import FmpClient
 from app.providers.gemini_deep_research import GeminiDeepResearchClient
 from app.routers.auth import router as auth_router
@@ -13,24 +15,41 @@ from app.workflow.orchestrator import WorkflowOrchestrator
 from app.workflow.sse import SseBroker
 
 app = FastAPI(title="CFAI Backend", version="0.1.0")
+allowed_origins = {
+    settings.frontend_url.rstrip("/"),
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+}
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=sorted(allowed_origins),
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 broker = SseBroker()
+fmp_client = FmpClient(
+    api_key=settings.fmp_api_key,
+    base_url=settings.fmp_base_url,
+    timeout_seconds=settings.fmp_timeout_seconds,
+)
+gemini_client = GeminiDeepResearchClient(
+    api_key=settings.google_api_key,
+    agent=settings.deep_research_agent,
+    structured_output_model=settings.structured_output_model,
+    poll_interval_seconds=settings.deep_research_poll_interval_seconds,
+    max_wait_seconds=settings.deep_research_max_wait_seconds,
+    enable_live_calls=settings.deep_research_enable_live_calls,
+)
+advisor_client = AdvisorClient(gemini_client=gemini_client)
 workflow_orchestrator = WorkflowOrchestrator(
     broker,
-    GeminiDeepResearchClient(
-        api_key=settings.google_api_key,
-        agent=settings.deep_research_agent,
-        structured_output_model=settings.structured_output_model,
-        poll_interval_seconds=settings.deep_research_poll_interval_seconds,
-        max_wait_seconds=settings.deep_research_max_wait_seconds,
-        enable_live_calls=settings.deep_research_enable_live_calls,
-    ),
+    gemini_client,
+    fmp_client,
+    advisor_client,
 )
 seed_service = CatalogSeedService(
-    fmp_client=FmpClient(
-        api_key=settings.fmp_api_key,
-        base_url=settings.fmp_base_url,
-        timeout_seconds=settings.fmp_timeout_seconds,
-    ),
+    fmp_client=fmp_client,
     session_factory=AsyncSessionLocal,
 )
 app.include_router(auth_router)

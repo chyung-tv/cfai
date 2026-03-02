@@ -1,6 +1,6 @@
 # CFAI Roadmap and Progress Tracker
 
-Last updated: 2026-03-01 (resolve_query + deep_research progress integrated)
+Last updated: 2026-03-02 (workflow prototype satisfactory milestone reached)
 Purpose: execution tracker only (progress, sequencing, checkpoints, acceptance).
 
 ---
@@ -19,7 +19,7 @@ Purpose: execution tracker only (progress, sequencing, checkpoints, acceptance).
 
 - Active module: Module 3 - Backend Core
 - Current owner: user + coding agent
-- Next acceptance checkpoint: finalize strict trigger/access contracts, then implement `structured_output` on top of completed `deep_research` output.
+- Next acceptance checkpoint: finalize strict trigger/access contracts, then implement `persist_artifacts` to close the workflow pipeline.
 - Blockers: see `./debuglog.md`
 
 ### Session Briefing (for every new agent session)
@@ -33,8 +33,8 @@ Use this response order:
 Keep this block updated:
 
 - Where we are at: Modules 1 and 2 are complete with stable Docker-first frontend/backend/postgres runtime.
-- What we need to implement next: complete strict trigger/access split (lookup + result-access + trigger), then implement `structured_output` as the next analysis node.
-- What we just implemented: completed live `deep_research` node validation on AMD and persisted the report payload in `analysis_workflows.result_payload` for downstream node testing.
+- What we need to implement next: complete strict trigger/access split (lookup + result-access + trigger), then implement `persist_artifacts` and finalize completion path.
+- What we just implemented: reached a satisfactory workflow prototype with DB-backed demo rendering, fixed structured output UI shape, reverse DCF/audit/advisor integration, and profile-by-case advisor matrix semantics.
 
 ### Execution Notes
 
@@ -138,8 +138,13 @@ Immediate step order:
 
 1. Implement `resolve_query` against seeded catalog shape. (completed)
 2. Implement `deep_research` node and persist report payload. (completed)
-3. Implement `structured_output` and continue node-by-node sequence.
-4. Preserve event persistence + SSE semantics.
+3. Implement `structured_output` on top of deep research output. (completed)
+3b. Finalize fixed UI-first `structured_output` schema and remove dynamic runtime shape. (completed)
+4. Implement `reverse_dcf` and continue node-by-node sequence. (completed)
+5. Implement `audit_growth_likelihood` and continue node-by-node sequence. (completed)
+6. Implement `advisor_decision` and continue node-by-node sequence. (completed)
+7. Preserve event persistence + SSE semantics. (in progress)
+8. Prototype milestone: workflow output and demo rendering are satisfactory for current iteration. (completed)
 
 Acceptance checkpoint:
 

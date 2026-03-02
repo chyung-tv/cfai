@@ -43,23 +43,21 @@ Strict output requirements:
   4. Industry Profile
      - 10-year industry outlook, market structure, competitive landscape, ecosystem,
        suppliers/regulation/disruption risks, secular drivers
-  5. Financial Profile
-     - Trailing 5-year ROE, ROIC, ROCE (with peer comparison)
-     - 10-year revenue CAGR and operating margin projection
-     - Include a clear assumptions table explaining the model basis
+  5. Financial Resilience and Unit Economics
+     - Focus on qualitative durability and capital discipline, not long-range model outputs
+     - Analyze margin quality, reinvestment intensity, operating leverage, cash conversion quality,
+       balance-sheet flexibility, and downside resilience under stress
+     - If numerical data is available, use it as supporting context only; do not invent or overfit projections
   6. Recent Developments (last 6 months)
      - Notable company/sector events and >10% stock moves with likely drivers
   7. Life Line
      - Condense the entire research into the single most critical business lifeline
      - Explicitly name one factor the company thrives on
      - Explicitly describe the break condition: if this factor fails, why the company is in danger
-  8. Gemini Verdict
-     - Clear investment decision with viewpoint-based conditions
-     - Example style: attractive for growth-focused investors, less suitable for cash-flow-focused investors
-     - Include alternatives in related industry/assets
 
 Methodology and transparency requirements:
-- Explicitly explain reasoning for complex judgments and projections.
+- Explicitly explain reasoning for complex judgments.
+- Keep qualitative analysis falsifiable: each major conclusion should name the evidence, mechanism, and failure mode.
 - Mark unknown data as unavailable rather than fabricating.
 - For each major quantitative statement, include source attribution inline and also in Works Cited.
 - Include a final "Works Cited" section with URL links.

@@ -9,11 +9,16 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.analysis_workflow import AnalysisWorkflow
 from app.models.analysis_workflow_event import AnalysisWorkflowEvent
+from app.providers.advisor_client import AdvisorClient
+from app.providers.fmp_client import FmpClient
 from app.providers.gemini_deep_research import GeminiDeepResearchClient
+from app.workflow.nodes.advisor_decision import AdvisorDecisionNode
+from app.workflow.nodes.audit_growth_likelihood import AuditGrowthLikelihoodNode
 from app.workflow.nodes.deep_research import DeepResearchNode
 from app.workflow.nodes.publish_sse import PublishSseNode
 from app.workflow.nodes.resolve_cache import ResolveCacheNode
 from app.workflow.nodes.resolve_query import ResolveQueryNode
+from app.workflow.nodes.reverse_dcf import ReverseDcfNode
 from app.workflow.nodes.structured_output import StructuredOutputNode
 from app.workflow.nodes.validate_input import ValidateInputNode
 from app.workflow.sse import SseBroker
@@ -21,9 +26,17 @@ from app.workflow.types import Transition, WorkflowState
 
 
 class WorkflowOrchestrator:
-    def __init__(self, sse_broker: SseBroker, deep_research_client: GeminiDeepResearchClient) -> None:
+    def __init__(
+        self,
+        sse_broker: SseBroker,
+        deep_research_client: GeminiDeepResearchClient,
+        fmp_client: FmpClient,
+        advisor_client: AdvisorClient,
+    ) -> None:
         self._sse_broker = sse_broker
         self._deep_research_client = deep_research_client
+        self._fmp_client = fmp_client
+        self._advisor_client = advisor_client
         self._tasks: set[asyncio.Task] = set()
 
     def _track_task(self, task: asyncio.Task) -> None:
@@ -138,6 +151,39 @@ class WorkflowOrchestrator:
                     "Structuring deep research output",
                 )
                 output = await StructuredOutputNode(self._deep_research_client).execute(context)
+                workflow.result_payload = output["result"]
+                await db.commit()
+
+                await self._emit(
+                    db,
+                    workflow,
+                    WorkflowState.running,
+                    "reverse_dcf",
+                    "Running reverse DCF calculation",
+                )
+                output = await ReverseDcfNode(self._fmp_client).execute(context)
+                workflow.result_payload = output["result"]
+                await db.commit()
+
+                await self._emit(
+                    db,
+                    workflow,
+                    WorkflowState.running,
+                    "audit_growth_likelihood",
+                    "Auditing growth likelihood against deep research evidence",
+                )
+                output = await AuditGrowthLikelihoodNode(self._deep_research_client).execute(context)
+                workflow.result_payload = output["result"]
+                await db.commit()
+
+                await self._emit(
+                    db,
+                    workflow,
+                    WorkflowState.running,
+                    "advisor_decision",
+                    "Generating investor-profile advisor actions",
+                )
+                output = await AdvisorDecisionNode(self._advisor_client).execute(context)
                 workflow.result_payload = output["result"]
                 await db.commit()
 

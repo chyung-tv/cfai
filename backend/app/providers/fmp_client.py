@@ -106,6 +106,85 @@ class FmpClient:
             params={"symbol": normalized},
         )
 
+    async def fetch_quote(self, symbol: str) -> FmpCallResult:
+        normalized = symbol.strip().upper()
+        return await self._request_with_fallback(
+            candidates=(
+                "/stable/quote",
+                f"/api/v3/quote/{normalized}",
+            ),
+            params={"symbol": normalized},
+        )
+
+    async def fetch_income_statement(
+        self,
+        symbol: str,
+        *,
+        period: str | None = None,
+        limit: int = 8,
+    ) -> FmpCallResult:
+        return await self._fetch_statement(
+            symbol=symbol,
+            stable_endpoint="/stable/income-statement",
+            v3_prefix="/api/v3/income-statement",
+            period=period,
+            limit=limit,
+        )
+
+    async def fetch_cash_flow_statement(
+        self,
+        symbol: str,
+        *,
+        period: str | None = None,
+        limit: int = 8,
+    ) -> FmpCallResult:
+        return await self._fetch_statement(
+            symbol=symbol,
+            stable_endpoint="/stable/cash-flow-statement",
+            v3_prefix="/api/v3/cash-flow-statement",
+            period=period,
+            limit=limit,
+        )
+
+    async def fetch_balance_sheet_statement(
+        self,
+        symbol: str,
+        *,
+        period: str | None = None,
+        limit: int = 8,
+    ) -> FmpCallResult:
+        return await self._fetch_statement(
+            symbol=symbol,
+            stable_endpoint="/stable/balance-sheet-statement",
+            v3_prefix="/api/v3/balance-sheet-statement",
+            period=period,
+            limit=limit,
+        )
+
+    async def _fetch_statement(
+        self,
+        *,
+        symbol: str,
+        stable_endpoint: str,
+        v3_prefix: str,
+        period: str | None,
+        limit: int,
+    ) -> FmpCallResult:
+        normalized = symbol.strip().upper()
+        params: dict[str, Any] = {
+            "symbol": normalized,
+            "limit": limit,
+        }
+        if period:
+            params["period"] = period
+        return await self._request_with_fallback(
+            candidates=(
+                stable_endpoint,
+                f"{v3_prefix}/{normalized}",
+            ),
+            params=params,
+        )
+
     async def _request_with_fallback(
         self,
         *,
