@@ -1,0 +1,283 @@
+from __future__ import annotations
+
+import asyncio
+import json
+import re
+import time
+from dataclasses import dataclass
+from typing import Any
+
+from google import genai
+
+
+class DeepResearchProviderError(Exception):
+    def __init__(self, code: str, message: str) -> None:
+        super().__init__(message)
+        self.code = code
+
+
+@dataclass(frozen=True)
+class DeepResearchCitation:
+    title: str | None
+    url: str | None
+    publisher: str | None = None
+    accessed_at: str | None = None
+
+
+@dataclass(frozen=True)
+class DeepResearchResult:
+    interaction_id: str
+    report_markdown: str
+    citations: list[DeepResearchCitation]
+    model_metadata: dict[str, Any]
+
+
+@dataclass(frozen=True)
+class StructuredOutputResult:
+    structured_output: dict[str, Any]
+    model_metadata: dict[str, Any]
+
+
+class GeminiDeepResearchClient:
+    def __init__(
+        self,
+        *,
+        api_key: str,
+        agent: str,
+        structured_output_model: str,
+        poll_interval_seconds: int,
+        max_wait_seconds: int,
+        enable_live_calls: bool,
+    ) -> None:
+        self._api_key = api_key
+        self._agent = agent
+        self._structured_output_model = structured_output_model
+        self._poll_interval_seconds = max(1, poll_interval_seconds)
+        self._max_wait_seconds = max(10, max_wait_seconds)
+        self._enable_live_calls = enable_live_calls
+        self._client: genai.Client | None = None
+
+    async def run_report(self, *, prompt: str) -> DeepResearchResult:
+        normalized_prompt = prompt.strip()
+        if not normalized_prompt:
+            raise DeepResearchProviderError("invalid_prompt", "prompt is required")
+
+        if not self._enable_live_calls:
+            return DeepResearchResult(
+                interaction_id="dry-run",
+                report_markdown=(
+                    "Deep research live call is disabled. "
+                    "Enable DEEP_RESEARCH_ENABLE_LIVE_CALLS=true to execute."
+                ),
+                citations=[],
+                model_metadata={
+                    "mode": "dry_run",
+                    "agent": self._agent,
+                    "pollIntervalSeconds": self._poll_interval_seconds,
+                    "maxWaitSeconds": self._max_wait_seconds,
+                },
+            )
+
+        if not self._api_key:
+            raise DeepResearchProviderError(
+                "missing_api_key",
+                "GOOGLE_API_KEY is not configured",
+            )
+
+        interaction = await asyncio.to_thread(self._create_interaction, normalized_prompt)
+        interaction_id = self._read_field(interaction, "id")
+        if not interaction_id:
+            raise DeepResearchProviderError("missing_interaction_id", "interaction id was missing")
+
+        deadline = time.monotonic() + self._max_wait_seconds
+        while time.monotonic() < deadline:
+            current = await asyncio.to_thread(self._get_interaction, interaction_id)
+            status = (self._read_field(current, "status") or "").lower()
+            if status == "completed":
+                report_markdown = self._extract_report_markdown(current)
+                citations = self._extract_citations(current)
+                if not report_markdown.strip():
+                    raise DeepResearchProviderError("empty_report", "completed interaction returned no text")
+                return DeepResearchResult(
+                    interaction_id=interaction_id,
+                    report_markdown=report_markdown,
+                    citations=citations,
+                    model_metadata={
+                        "agent": self._agent,
+                        "status": status,
+                    },
+                )
+            if status == "failed":
+                error_message = self._read_field(current, "error") or "deep research interaction failed"
+                raise DeepResearchProviderError("provider_failed", str(error_message))
+
+            await asyncio.sleep(self._poll_interval_seconds)
+
+        raise DeepResearchProviderError(
+            "provider_timeout",
+            f"deep research exceeded max wait of {self._max_wait_seconds}s",
+        )
+
+    async def normalize_structured_output(self, *, prompt: str) -> StructuredOutputResult:
+        normalized_prompt = prompt.strip()
+        if not normalized_prompt:
+            raise DeepResearchProviderError("invalid_prompt", "structured output prompt is required")
+        if not self._enable_live_calls:
+            raise DeepResearchProviderError(
+                "live_calls_disabled",
+                "structured output normalization requires DEEP_RESEARCH_ENABLE_LIVE_CALLS=true",
+            )
+        if not self._api_key:
+            raise DeepResearchProviderError("missing_api_key", "GOOGLE_API_KEY is not configured")
+
+        parsed = await self.generate_json_object(prompt=normalized_prompt)
+
+        return StructuredOutputResult(
+            structured_output=parsed,
+            model_metadata={
+                "model": self._structured_output_model,
+                "status": "completed",
+            },
+        )
+
+    async def generate_json_object(self, *, prompt: str) -> dict[str, Any]:
+        normalized_prompt = prompt.strip()
+        if not normalized_prompt:
+            raise DeepResearchProviderError("invalid_prompt", "json generation prompt is required")
+        if not self._enable_live_calls:
+            raise DeepResearchProviderError(
+                "live_calls_disabled",
+                "json generation requires DEEP_RESEARCH_ENABLE_LIVE_CALLS=true",
+            )
+        if not self._api_key:
+            raise DeepResearchProviderError("missing_api_key", "GOOGLE_API_KEY is not configured")
+
+        response = await asyncio.to_thread(self._generate_structured_content, normalized_prompt)
+        raw_text = self._extract_response_text(response)
+        if not raw_text:
+            raise DeepResearchProviderError("empty_structured_output", "model returned no text")
+
+        parsed = self._parse_json_object(raw_text)
+        if not isinstance(parsed, dict):
+            raise DeepResearchProviderError("invalid_json_shape", "model output must be a JSON object")
+        return parsed
+
+    def _create_interaction(self, prompt: str) -> Any:
+        return self._get_client().interactions.create(
+            input=prompt,
+            agent=self._agent,
+            background=True,
+            store=True,
+        )
+
+    def _generate_structured_content(self, prompt: str) -> Any:
+        return self._get_client().models.generate_content(
+            model=self._structured_output_model,
+            contents=prompt,
+        )
+
+    def _get_interaction(self, interaction_id: str) -> Any:
+        return self._get_client().interactions.get(interaction_id)
+
+    def _get_client(self) -> genai.Client:
+        if self._client is None:
+            self._client = genai.Client(api_key=self._api_key)
+        return self._client
+
+    @staticmethod
+    def _read_field(obj: Any, field: str) -> Any:
+        if obj is None:
+            return None
+        value = getattr(obj, field, None)
+        if value is not None:
+            return value
+        if isinstance(obj, dict):
+            return obj.get(field)
+        return None
+
+    def _extract_report_markdown(self, interaction: Any) -> str:
+        outputs = self._read_field(interaction, "outputs")
+        if not isinstance(outputs, list) or not outputs:
+            return ""
+
+        last_output = outputs[-1]
+        direct_text = self._read_field(last_output, "text")
+        if isinstance(direct_text, str):
+            return direct_text
+
+        content = self._read_field(last_output, "content")
+        if isinstance(content, list):
+            parts: list[str] = []
+            for item in content:
+                text = self._read_field(item, "text")
+                if isinstance(text, str):
+                    parts.append(text)
+            return "\n".join(parts).strip()
+        return ""
+
+    def _extract_citations(self, interaction: Any) -> list[DeepResearchCitation]:
+        citation_rows = self._read_field(interaction, "citations")
+        if not isinstance(citation_rows, list):
+            return []
+
+        parsed: list[DeepResearchCitation] = []
+        for row in citation_rows:
+            parsed.append(
+                DeepResearchCitation(
+                    title=self._read_field(row, "title"),
+                    url=self._read_field(row, "url"),
+                    publisher=self._read_field(row, "publisher"),
+                    accessed_at=self._read_field(row, "accessedAt"),
+                )
+            )
+        return parsed
+
+    def _extract_response_text(self, response: Any) -> str:
+        direct_text = self._read_field(response, "text")
+        if isinstance(direct_text, str) and direct_text.strip():
+            return direct_text.strip()
+
+        candidates = self._read_field(response, "candidates")
+        if isinstance(candidates, list):
+            for candidate in candidates:
+                content = self._read_field(candidate, "content")
+                parts = self._read_field(content, "parts")
+                if isinstance(parts, list):
+                    chunks: list[str] = []
+                    for part in parts:
+                        text = self._read_field(part, "text")
+                        if isinstance(text, str):
+                            chunks.append(text)
+                    if chunks:
+                        return "\n".join(chunks).strip()
+        return ""
+
+    def _parse_json_object(self, raw_text: str) -> dict[str, Any]:
+        text = raw_text.strip()
+        if text.startswith("```"):
+            text = re.sub(r"^```[a-zA-Z0-9_-]*\n", "", text)
+            text = re.sub(r"\n```$", "", text)
+            text = text.strip()
+
+        try:
+            parsed = json.loads(text)
+            if isinstance(parsed, dict):
+                return parsed
+        except json.JSONDecodeError:
+            pass
+
+        start = text.find("{")
+        end = text.rfind("}")
+        if start != -1 and end != -1 and end > start:
+            candidate = text[start : end + 1]
+            try:
+                parsed = json.loads(candidate)
+                if isinstance(parsed, dict):
+                    return parsed
+            except json.JSONDecodeError as exc:
+                raise DeepResearchProviderError(
+                    "invalid_json",
+                    f"model returned invalid json: {exc}",
+                ) from exc
+
+        raise DeepResearchProviderError("invalid_json", "model returned non-json text")

@@ -9,17 +9,21 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.analysis_workflow import AnalysisWorkflow
 from app.models.analysis_workflow_event import AnalysisWorkflowEvent
-from app.workflow.nodes.execute_placeholder import ExecutePlaceholderNode
+from app.providers.gemini_deep_research import GeminiDeepResearchClient
+from app.workflow.nodes.deep_research import DeepResearchNode
 from app.workflow.nodes.publish_sse import PublishSseNode
 from app.workflow.nodes.resolve_cache import ResolveCacheNode
+from app.workflow.nodes.resolve_query import ResolveQueryNode
+from app.workflow.nodes.structured_output import StructuredOutputNode
 from app.workflow.nodes.validate_input import ValidateInputNode
 from app.workflow.sse import SseBroker
 from app.workflow.types import Transition, WorkflowState
 
 
 class WorkflowOrchestrator:
-    def __init__(self, sse_broker: SseBroker) -> None:
+    def __init__(self, sse_broker: SseBroker, deep_research_client: GeminiDeepResearchClient) -> None:
         self._sse_broker = sse_broker
+        self._deep_research_client = deep_research_client
         self._tasks: set[asyncio.Task] = set()
 
     def _track_task(self, task: asyncio.Task) -> None:
@@ -73,6 +77,7 @@ class WorkflowOrchestrator:
                 "workflow_id": workflow.id,
                 "symbol": workflow.symbol,
                 "force_refresh": workflow.force_refresh,
+                "db": db,
             }
             try:
                 await self._emit(
@@ -83,6 +88,17 @@ class WorkflowOrchestrator:
                     "Validating input",
                 )
                 await ValidateInputNode().execute(context)
+
+                await self._emit(
+                    db,
+                    workflow,
+                    WorkflowState.running,
+                    "resolve_query",
+                    "Resolving query to catalog symbol",
+                )
+                await ResolveQueryNode().execute(context)
+                workflow.symbol = context["symbol"]
+                await db.commit()
 
                 await self._emit(
                     db,
@@ -109,11 +125,20 @@ class WorkflowOrchestrator:
                     db,
                     workflow,
                     WorkflowState.running,
-                    "assemble_result",
-                    "Generating placeholder analysis result",
+                    "deep_research",
+                    "Running deep research analysis",
                 )
-                output = await ExecutePlaceholderNode().execute(context)
-                workflow.result_payload = output.get("result")
+                await DeepResearchNode(self._deep_research_client).execute(context)
+
+                await self._emit(
+                    db,
+                    workflow,
+                    WorkflowState.running,
+                    "structured_output",
+                    "Structuring deep research output",
+                )
+                output = await StructuredOutputNode(self._deep_research_client).execute(context)
+                workflow.result_payload = output["result"]
                 await db.commit()
 
                 await self._emit(

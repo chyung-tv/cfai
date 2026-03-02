@@ -1,6 +1,6 @@
 # CFAI Architecture Decision Log
 
-Last updated: 2026-02-27
+Last updated: 2026-03-01
 Purpose: record architecture decisions, alternatives, rationale, and consequences.
 
 ---
@@ -131,3 +131,47 @@ Purpose: record architecture decisions, alternatives, rationale, and consequence
     - requires eventual reconciliation between async generation and read consistency
 - Related architecture section: `./architecture.md#42-read-model-direction`
 - Related roadmap phase/step: `./roadmap.md#module-3-backend-core-fastapi-workflow-auth-rbac-quota`
+
+### [ADR-0006] Starter-plan seed universe uses directory+screener top-500 US proxy
+- Date: 2026-03-01
+- Status: `accepted`
+- Context:
+  - Starter plan access may not include an S&P500 constituent endpoint.
+  - Resolver implementation still requires a deterministic ~500-symbol seeded catalog.
+- Decision:
+  - Use stock directory plus screener-based market-cap ranking to derive a deterministic top-500 US active common-stock seed universe.
+  - Keep endpoint strategy hybrid (prefer stable endpoints, fallback to v3).
+  - Keep provider failure policy fail-closed for seed runs.
+- Alternatives considered:
+  - Option A: block all seed work until S&P500 endpoint access is available.
+  - Option B: use directory+screener top-500 proxy for v1 seed.
+- Consequences:
+  - Pros:
+    - unblocks ingestion-first sequencing on current subscription
+    - preserves deterministic resolver readiness with bounded catalog size
+  - Cons:
+    - universe is not exact S&P500 membership
+- Related architecture section: `./architecture.md#31-maintenance-workflow-domain`
+- Related roadmap phase/step: `./roadmap.md#module-3-backend-core-fastapi-workflow-auth-rbac-quota`
+
+### [ADR-0007] v1 deep-research payload persists as markdown-first with embedded citations
+- Date: 2026-03-01
+- Status: `accepted`
+- Context:
+  - Deep research output is long-form report content used directly by downstream workflow nodes and frontend rendering.
+  - Attempting strict citation extraction from interaction metadata is schema-sensitive and not required to unblock current node sequence.
+- Decision:
+  - Persist deep research output as a markdown-first payload in `analysis_workflows.result_payload`.
+  - Keep citations embedded in the markdown report text for v1; treat separate structured citation extraction as deferred enhancement.
+  - Keep report payload reusable by downstream nodes from the same persisted result object.
+- Alternatives considered:
+  - Option A: require normalized citation array extraction before considering deep-research node complete.
+  - Option B: accept markdown-first persistence with embedded citations for v1 and defer normalization.
+- Consequences:
+  - Pros:
+    - unblocks downstream node implementation (`structured_output` onward) with stable persisted payload
+    - minimizes parser fragility and rework risk in early integration phase
+  - Cons:
+    - machine-readable citation analytics are limited until normalization is implemented
+- Related architecture section: `./architecture.md#4-data-architecture`
+- Related roadmap phase/step: `./roadmap.md#33-analysis-workflow-submodule`

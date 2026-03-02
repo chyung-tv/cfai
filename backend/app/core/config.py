@@ -14,6 +14,13 @@ def _as_int(name: str, default: int) -> int:
         return default
 
 
+def _as_bool(name: str, default: bool) -> bool:
+    raw = os.getenv(name)
+    if raw is None:
+        return default
+    return raw.strip().lower() in {"1", "true", "yes", "on"}
+
+
 @dataclass(frozen=True)
 class Settings:
     database_url: str = os.getenv(
@@ -31,6 +38,18 @@ class Settings:
     session_cookie_secure: bool = os.getenv("SESSION_COOKIE_SECURE", "false").lower() == "true"
     session_ttl_seconds: int = _as_int("SESSION_TTL_SECONDS", 60 * 60 * 24 * 7)
     password_reset_ttl_seconds: int = _as_int("PASSWORD_RESET_TTL_SECONDS", 60 * 30)
+    fmp_api_key: str = os.getenv("FMP_API_KEY", "")
+    fmp_base_url: str = os.getenv("FMP_BASE_URL", "https://financialmodelingprep.com")
+    fmp_timeout_seconds: int = _as_int("FMP_TIMEOUT_SECONDS", 30)
+    google_api_key: str = os.getenv("GOOGLE_API_KEY", "")
+    deep_research_agent: str = os.getenv(
+        "DEEP_RESEARCH_AGENT",
+        "deep-research-pro-preview-12-2025",
+    )
+    structured_output_model: str = os.getenv("STRUCTURED_OUTPUT_MODEL", "gemini-2.5-flash")
+    deep_research_poll_interval_seconds: int = _as_int("DEEP_RESEARCH_POLL_INTERVAL_SECONDS", 10)
+    deep_research_max_wait_seconds: int = _as_int("DEEP_RESEARCH_MAX_WAIT_SECONDS", 1200)
+    deep_research_enable_live_calls: bool = _as_bool("DEEP_RESEARCH_ENABLE_LIVE_CALLS", False)
 
 
 settings = Settings()

@@ -1,6 +1,6 @@
 # CFAI Architecture Snapshot
 
-Last updated: 2026-02-27 (integrated legacy backend + frontend baseline memories)
+Last updated: 2026-03-01 (analysis workflow node and payload updates)
 Purpose: latest agreed target-state architecture snapshot for Phase 1.
 
 ---
@@ -38,7 +38,7 @@ Purpose: latest agreed target-state architecture snapshot for Phase 1.
   - immediate bootstrap seed run
   - weekly refresh cadence target
 - Current v1 ingestion scope:
-  - S&P500 seed (~500 symbols)
+  - deterministic top-500 US active-common-stock seed (directory + screener proxy on Starter plan)
   - optional enrichment metadata (market cap/quote) when available
 - Runtime characteristics:
   - idempotent upsert
@@ -70,6 +70,7 @@ Purpose: latest agreed target-state architecture snapshot for Phase 1.
   - `analysis_workflows` (workflow lifecycle state)
   - `analysis_workflow_events` (timeline/transition log, light payload)
   - `analysis_workflow_artifacts` (node output artifacts, heavy payload)
+  - v1 deep-research payload shape: markdown-first report persisted in `analysis_workflows.result_payload`
 - Catalog:
   - `stock_catalog` (canonical stock identity and resolver lookup base)
 
@@ -122,6 +123,7 @@ Purpose: latest agreed target-state architecture snapshot for Phase 1.
 - Final frontend read-model API contract is deferred.
 - Final fuzzy threshold policy for query resolution is deferred until post-seed catalog validation.
 - Full-market catalog expansion beyond S&P500 is deferred after prototype stabilization.
+- Structured citation normalization from deep-research output is deferred; embedded citations in markdown are accepted for v1.
 
 ## 9) Integrated Baselines
 

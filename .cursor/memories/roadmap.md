@@ -1,6 +1,6 @@
 # CFAI Roadmap and Progress Tracker
 
-Last updated: 2026-02-27 (integrated baseline-memory cleanup)
+Last updated: 2026-03-01 (resolve_query + deep_research progress integrated)
 Purpose: execution tracker only (progress, sequencing, checkpoints, acceptance).
 
 ---
@@ -19,7 +19,7 @@ Purpose: execution tracker only (progress, sequencing, checkpoints, acceptance).
 
 - Active module: Module 3 - Backend Core
 - Current owner: user + coding agent
-- Next acceptance checkpoint: implement maintenance seed path (S&P500-first), validate catalog, then start `resolve_query` implementation.
+- Next acceptance checkpoint: finalize strict trigger/access contracts, then implement `structured_output` on top of completed `deep_research` output.
 - Blockers: see `./debuglog.md`
 
 ### Session Briefing (for every new agent session)
@@ -33,8 +33,8 @@ Use this response order:
 Keep this block updated:
 
 - Where we are at: Modules 1 and 2 are complete with stable Docker-first frontend/backend/postgres runtime.
-- What we need to implement next: execute ingestion-first sequence in Module 3 (`maintenance` seed -> catalog validation -> `resolve_query` implementation), then continue analysis workflow materialization.
-- What we just implemented: integrated legacy backend/frontend baseline memories into `architecture.md`, removed redundant memory files, and aligned memory/implementation rules with the new memory role split.
+- What we need to implement next: complete strict trigger/access split (lookup + result-access + trigger), then implement `structured_output` as the next analysis node.
+- What we just implemented: completed live `deep_research` node validation on AMD and persisted the report payload in `analysis_workflows.result_payload` for downstream node testing.
 
 ### Execution Notes
 
@@ -60,6 +60,8 @@ Keep this block updated:
 - Workflow isolation decision -> `./architecture-decisions.md#adr-0001-split-runtime-into-maintenance-and-analysis-workflow-domains`
 - Ingestion-first sequencing -> `./architecture-decisions.md#adr-0002-ingestion-first-sequencing-before-resolve_query-implementation`
 - S&P500-first seed scope -> `./architecture-decisions.md#adr-0003-v1-catalog-seed-scope-is-sp500-first`
+- Starter-plan top500-us seed proxy -> `./architecture-decisions.md#adr-0006-starter-plan-seed-universe-uses-directoryscreener-top-500-us-proxy`
+- Deep-research payload persistence v1 -> `./architecture-decisions.md#adr-0007-v1-deep-research-payload-persists-as-markdown-first-with-embedded-citations`
 - Auth sequencing -> `./architecture-decisions.md#adr-0004-auth-implementation-sequencing-defers-firebase-option-b-pivot`
 - Hybrid read-path direction -> `./architecture-decisions.md#adr-0005-read-path-direction-is-hybrid-projection-table-is-target-read-model`
 
@@ -134,14 +136,16 @@ Execution goal:
 
 Immediate step order:
 
-1. Implement `resolve_query` against seeded catalog shape.
-2. Continue node-by-node implementation sequence.
-3. Preserve event persistence + SSE semantics.
+1. Implement `resolve_query` against seeded catalog shape. (completed)
+2. Implement `deep_research` node and persist report payload. (completed)
+3. Implement `structured_output` and continue node-by-node sequence.
+4. Preserve event persistence + SSE semantics.
 
 Acceptance checkpoint:
 
 - trigger -> transitions -> SSE -> persisted results works end-to-end
 - resolver behavior is deterministic for v1 scope
+- deep research report payload is persisted and reusable by downstream nodes
 
 ### 3.4 Persistence and Cache Submodule
 
