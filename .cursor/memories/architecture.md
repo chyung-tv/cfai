@@ -1,6 +1,6 @@
 # CFAI Architecture Snapshot
 
-Last updated: 2026-03-01 (analysis workflow node and payload updates)
+Last updated: 2026-03-04 (projection read-model and frontend results UX update)
 Purpose: latest agreed target-state architecture snapshot for Phase 1.
 
 ---
@@ -30,6 +30,10 @@ Purpose: latest agreed target-state architecture snapshot for Phase 1.
 
 ## 3) Workflow Domains
 
+Implementation packaging (current direction):
+- Shared workflow runtime primitives live in `backend/app/core/workflow`.
+- Domain workflows live in `backend/app/workflows/<domain>`.
+
 ### 3.1 Maintenance Workflow Domain
 
 - Purpose: ingest and refresh foundational stock data in `stock_catalog`.
@@ -57,6 +61,7 @@ Purpose: latest agreed target-state architecture snapshot for Phase 1.
   - persisted transitions
   - SSE progress visibility
   - artifact-oriented handoff (reference-heavy, payload-light context)
+  - test-only optional deep-research skip path (`SKIP_DEEP_RESEARCH_IN_TESTS`) that seeds fixture-like report input and keeps downstream node execution intact
 
 ## 4) Data Architecture
 
@@ -77,7 +82,7 @@ Purpose: latest agreed target-state architecture snapshot for Phase 1.
 ### 4.2 Read Model Direction
 
 - Target direction: a dedicated projection/read-model table for stable frontend reads.
-- Current status: deferred implementation; architecture direction is accepted, execution timing is roadmap-driven.
+- Current status: implemented via `analysis_workflow_projections` with event-driven updates and a versioned normalization boundary (`contract_version`).
 
 ### 4.3 Cache and Artifact Contract
 
@@ -120,7 +125,8 @@ Purpose: latest agreed target-state architecture snapshot for Phase 1.
 
 ## 8) Open Items and Deferred Scope
 
-- Final frontend read-model API contract is deferred.
+- Final frontend read-model API contract beyond `/analysis/latest` remains deferred.
+- Projection normalization/versioning hardening and reprojection tooling are follow-up scope after ADR-0008 acceptance.
 - Final fuzzy threshold policy for query resolution is deferred until post-seed catalog validation.
 - Full-market catalog expansion beyond S&P500 is deferred after prototype stabilization.
 - Structured citation normalization from deep-research output is deferred; embedded citations in markdown are accepted for v1.

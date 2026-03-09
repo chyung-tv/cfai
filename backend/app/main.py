@@ -4,15 +4,15 @@ from sqlalchemy import text
 
 from app.core.config import settings
 from app.db.session import AsyncSessionLocal
-from app.maintenance.seed_service import CatalogSeedService
 from app.providers.advisor_client import AdvisorClient
 from app.providers.fmp_client import FmpClient
 from app.providers.gemini_deep_research import GeminiDeepResearchClient
 from app.routers.auth import router as auth_router
 from app.routers.maintenance import create_maintenance_router
 from app.routers.workflow import create_workflow_router
-from app.workflow.orchestrator import WorkflowOrchestrator
-from app.workflow.sse import SseBroker
+from app.workflows.analysis.orchestrator import WorkflowOrchestrator
+from app.workflows.analysis.sse import SseBroker
+from app.workflows.maintenance.seed_service import CatalogSeedService
 
 app = FastAPI(title="CFAI Backend", version="0.1.0")
 allowed_origins = {

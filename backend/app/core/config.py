@@ -50,6 +50,7 @@ class Settings:
     deep_research_poll_interval_seconds: int = _as_int("DEEP_RESEARCH_POLL_INTERVAL_SECONDS", 10)
     deep_research_max_wait_seconds: int = _as_int("DEEP_RESEARCH_MAX_WAIT_SECONDS", 1200)
     deep_research_enable_live_calls: bool = _as_bool("DEEP_RESEARCH_ENABLE_LIVE_CALLS", False)
+    skip_deep_research_in_tests: bool = _as_bool("SKIP_DEEP_RESEARCH_IN_TESTS", False)
 
 
 settings = Settings()

@@ -5,8 +5,8 @@ from typing import Any
 from fastapi import APIRouter, Depends, HTTPException
 
 from app.dependencies.auth import require_role
-from app.maintenance.seed_service import CatalogSeedService
 from app.models.user import User
+from app.workflows.maintenance.seed_service import CatalogSeedService
 
 
 def create_maintenance_router(seed_service: CatalogSeedService) -> APIRouter:

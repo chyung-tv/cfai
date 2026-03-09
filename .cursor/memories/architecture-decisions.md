@@ -1,6 +1,6 @@
 # CFAI Architecture Decision Log
 
-Last updated: 2026-03-01
+Last updated: 2026-03-04
 Purpose: record architecture decisions, alternatives, rationale, and consequences.
 
 ---
@@ -175,3 +175,30 @@ Purpose: record architecture decisions, alternatives, rationale, and consequence
     - machine-readable citation analytics are limited until normalization is implemented
 - Related architecture section: `./architecture.md#4-data-architecture`
 - Related roadmap phase/step: `./roadmap.md#33-analysis-workflow-submodule`
+
+### [ADR-0008] Add frontend-optimized workflow projection read model
+- Date: 2026-03-04
+- Status: `accepted`
+- Context:
+  - Frontend pages increasingly need one-call retrieval of workflow run status + final payload + key node outputs.
+  - Current read path can require combining workflow row, event timeline, and artifact rows, which increases frontend orchestration and read latency.
+- Decision:
+  - Keep `analysis_workflow_events` and `analysis_workflow_artifacts` as source-of-truth operational/audit stores.
+  - Add a dedicated projection/read-model table for frontend-facing aggregate payloads.
+  - Projection writes are event-driven on workflow transitions, with additional updates on persisted node artifacts/result payload.
+  - Introduce a single projection normalization boundary that emits a versioned frontend contract (`contract_version`) with deterministic defaults and guardrails.
+  - Switch `/analysis/latest` read path to projection-backed retrieval while preserving payload compatibility.
+- Alternatives considered:
+  - Option A: query multiple source tables from frontend for every workflow detail view.
+  - Option B: aggregate into a projection table while preserving source tables.
+- Consequences:
+  - Pros:
+    - lower frontend retrieval complexity and fewer network/database round trips
+    - stable backend contract for UI rendering
+    - preserves debug/replay fidelity in source tables
+    - supports contract evolution via reprojection from source artifacts
+  - Cons:
+    - additional write/update path and consistency management
+    - requires normalization/version discipline as node payloads evolve
+- Related architecture section: `./architecture.md#42-read-model-direction`
+- Related roadmap phase/step: `./roadmap.md#34-persistence-and-cache-submodule`

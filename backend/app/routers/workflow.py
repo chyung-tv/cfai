@@ -11,11 +11,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.session import get_db
 from app.dependencies.auth import require_auth
-from app.models.analysis_workflow import AnalysisWorkflow
-from app.models.analysis_workflow_event import AnalysisWorkflowEvent
+from app.models.workflow.analysis_workflow import AnalysisWorkflow
+from app.models.workflow.analysis_workflow_event import AnalysisWorkflowEvent
+from app.models.workflow.analysis_workflow_projection import AnalysisWorkflowProjection
 from app.models.user import User
-from app.workflow.orchestrator import WorkflowOrchestrator
-from app.workflow.sse import SseBroker
+from app.workflows.analysis.projections.store import upsert_workflow_projection
+from app.workflows.analysis.orchestrator import WorkflowOrchestrator
+from app.workflows.analysis.sse import SseBroker
 
 
 class TriggerBody(BaseModel):
@@ -87,6 +89,20 @@ def create_workflow_router(
     ) -> dict[str, Any] | None:
         symbol = symbol.strip().upper()
         result = await db.execute(
+            select(AnalysisWorkflowProjection)
+            .where(
+                AnalysisWorkflowProjection.symbol == symbol,
+                AnalysisWorkflowProjection.state.in_(["completed", "completed_cached"]),
+            )
+            .order_by(desc(AnalysisWorkflowProjection.updated_at))
+            .limit(1)
+        )
+        projection = result.scalar_one_or_none()
+        if projection is not None:
+            return projection.result_payload
+
+        # Backward-compatible fallback for rows created before projection table rollout.
+        fallback = await db.execute(
             select(AnalysisWorkflow)
             .where(
                 AnalysisWorkflow.symbol == symbol,
@@ -95,7 +111,7 @@ def create_workflow_router(
             .order_by(desc(AnalysisWorkflow.updated_at))
             .limit(1)
         )
-        workflow = result.scalar_one_or_none()
+        workflow = fallback.scalar_one_or_none()
         if workflow is None:
             return None
         return workflow.result_payload
@@ -149,6 +165,7 @@ def create_workflow_router(
                 payload=None,
             )
         )
+        await upsert_workflow_projection(db, workflow, message="Marked failed manually")
         await db.commit()
         return {"status": "failed"}
 

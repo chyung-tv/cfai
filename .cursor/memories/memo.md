@@ -104,3 +104,33 @@ Purpose: capture solved problems, reusable fixes, and lessons learned.
 - Anti-pattern to avoid next time: coupling every container boot to a full dependency reinstall.
 - Related bug log: `./debuglog.md#mod2-devx-001-frontend-compose-reinstall-loop-caused-slow-or-faulty-startup-perception`
 - Related roadmap item: `./roadmap.md#module-2-containerized-runtime-foundation-docker--postgresql`
+
+### 2026-03-02 - Workflow legacy purge and canonical package cutover
+- Context: backend workflow refactor introduced new canonical paths, but temporary wrappers (`app/workflow`, `app/maintenance`, legacy model wrappers) remained and created ambiguity.
+- What worked: moved real implementations into `app/workflows/analysis` and `app/workflows/maintenance`, centralized shared runtime in `app/core/workflow`, then deleted wrapper trees after import/lint/runtime validation.
+- What failed: adapter-on-adapter layering initially caused duplication confusion and one circular-import issue in package initializers.
+- Final fix: removed legacy files entirely and kept only canonical imports under `app/workflows/*`, `app/core/workflow/*`, and `app/models/workflow/*`; validated with backend import checks and workflow runs.
+- Why it worked: one source-of-truth per domain/runtime concern eliminated path drift and reduced future refactor risk.
+- Reuse guidance: during staged migrations, set a short compatibility window and record a hard cutoff task to physically delete adapters once validation passes.
+- Anti-pattern to avoid next time: leaving compatibility wrappers in place after canonical paths are already stable.
+- Related roadmap item: `./roadmap.md#module-3-backend-core-fastapi-workflow-auth-rbac-quota`
+
+### 2026-03-04 - Projection read-model normalization boundary
+- Context: ADR-0008 implementation required a frontend-optimized projection table while node payload shapes remain flexible and evolve over time.
+- What worked: introduced a single projection normalizer at write time, versioned the contract (`contract_version`), and kept source artifacts/events as replayable truth.
+- What failed: relying on raw large JSON alone creates drift risk between node outputs and UI read expectations.
+- Final fix: added `analysis_workflow_projections` plus normalized payload composition on transition/artifact writes and switched `/analysis/latest` to projection-backed reads.
+- Why it worked: decouples node-internal evolution from frontend contract stability without losing audit/reprojection capability.
+- Reuse guidance: for read-model tables, normalize once at projection boundary and carry explicit contract versioning from day one.
+- Anti-pattern to avoid next time: forcing every node to emit UI-ready schema directly.
+- Related roadmap item: `./roadmap.md#34-persistence-and-cache-submodule`
+
+### 2026-03-04 - Compose migration command uses uv-run Alembic
+- Context: after backend runtime standardization on `uv`, direct `alembic` command inside compose run did not resolve in PATH.
+- What worked: executing migration commands via `docker compose run --rm backend uv run alembic ...`.
+- What failed: `docker compose run --rm backend alembic upgrade head` (`executable file not found in $PATH`).
+- Final fix: updated operator runbook/README migration commands to use `uv run alembic` consistently.
+- Why it worked: aligns migration execution with backend dependency/runtime manager and container environment.
+- Reuse guidance: when backend is managed by `uv`, wrap tool invocations (`alembic`, scripts) with `uv run`.
+- Anti-pattern to avoid next time: mixing host/global tool assumptions into containerized Python workflows.
+- Related roadmap item: `./roadmap.md#module-2-containerized-runtime-foundation-docker--postgresql`

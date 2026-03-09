@@ -1,6 +1,6 @@
 # CFAI Roadmap and Progress Tracker
 
-Last updated: 2026-03-02 (workflow prototype satisfactory milestone reached)
+Last updated: 2026-03-04 (ADR-0008 implementation validated with migration + container restart)
 Purpose: execution tracker only (progress, sequencing, checkpoints, acceptance).
 
 ---
@@ -12,14 +12,14 @@ Purpose: execution tracker only (progress, sequencing, checkpoints, acceptance).
 - [x] Module 1 - Hard Cutover and Pruning (completed)
 - [x] Module 2 - Containerized Runtime Foundation (Docker + PostgreSQL) (completed)
 - [ ] Module 3 - Backend Core (FastAPI Workflow, Auth, RBAC, Quota)
-- [ ] Module 4 - Frontend Adaptation (Readability and UX Integration)
+- [ ] Module 4 - Frontend Adaptation (Readability and UX Integration) (active)
 - [ ] Module 5 - Phase 1 Completion Gate
 
 ### Current Focus
 
-- Active module: Module 3 - Backend Core
+- Active module: Module 3 + Module 4 execution slice (projection read-model + results UI)
 - Current owner: user + coding agent
-- Next acceptance checkpoint: validate typed workflow context + artifact persistence + SSE/FE trigger integration with a full MPWR run.
+- Next acceptance checkpoint: verify projection-backed read parity and tabs-first `/demo/analysis` UX under live SSE transitions.
 - Blockers: see `./debuglog.md`
 
 ### Session Briefing (for every new agent session)
@@ -32,9 +32,9 @@ Use this response order:
 
 Keep this block updated:
 
-- Where we are at: Modules 1 and 2 are complete with stable Docker-first frontend/backend/postgres runtime.
-- What we need to implement next: harden persistence/read contracts with artifact endpoints/read-model shaping and complete Module 3 acceptance verification.
-- What we just implemented: added typed workflow context scaffolding, artifact table persistence hooks in orchestrator, lighter SSE completion payload semantics, reverse DCF parallel provider I/O, FE trigger+SSE+final-read demo path, and validated an MPWR end-to-end run with a single deep_research attempt.
+- Where we are at: Modules 1 and 2 are complete; Module 3 remains active with projection-backed read path now implemented; Module 4 is active with tabs-first results page upgrade landed.
+- What we need to implement next: complete full frontend acceptance validation on live user tests (`/demo/analysis`) and close remaining Module 3/4 acceptance checklist items.
+- What we just implemented: added `analysis_workflow_projections` table + projection normalizer/write hooks (`emit`, artifact persistence, manual fail path), refactored `/demo/analysis` into a tabs-first interactive readability-focused UI, and validated rollout by applying migration + restarting Docker runtime with healthy backend/db endpoints.
 
 ### Execution Notes
 
@@ -62,6 +62,7 @@ Keep this block updated:
 - S&P500-first seed scope -> `./architecture-decisions.md#adr-0003-v1-catalog-seed-scope-is-sp500-first`
 - Starter-plan top500-us seed proxy -> `./architecture-decisions.md#adr-0006-starter-plan-seed-universe-uses-directoryscreener-top-500-us-proxy`
 - Deep-research payload persistence v1 -> `./architecture-decisions.md#adr-0007-v1-deep-research-payload-persists-as-markdown-first-with-embedded-citations`
+- Frontend projection read-model optimization -> `./architecture-decisions.md#adr-0008-add-frontend-optimized-workflow-projection-read-model`
 - Auth sequencing -> `./architecture-decisions.md#adr-0004-auth-implementation-sequencing-defers-firebase-option-b-pivot`
 - Hybrid read-path direction -> `./architecture-decisions.md#adr-0005-read-path-direction-is-hybrid-projection-table-is-target-read-model`
 
@@ -163,6 +164,7 @@ Immediate step order:
 1. Finalize `stock_catalog` for maintenance workflow.
 2. Finalize analysis tables/contracts (`analysis_workflows`, `events`, `artifacts`).
 3. Keep cache-key/artifact-key contracts consistent with architecture snapshot.
+4. Projection read-model table for frontend one-call retrieval implemented (ADR-0008 accepted); next step is runtime hardening and acceptance verification.
 
 ### 3.5 RBAC and Quota Submodule
 
@@ -187,7 +189,7 @@ Guard order:
 
 ## Module 4) Frontend Adaptation (Readability and UX Integration)
 
-Status: pending
+Status: active
 
 Architecture mapping: `./architecture.md#2-component-topology`, `./architecture.md#5-api-and-event-boundaries`, `./architecture.md#92-frontend-uiux-baseline-integrated`
 
@@ -200,6 +202,7 @@ Execution goal:
 - Frontend can trigger analysis and display live progress.
 - Frontend can fetch and render final readable result payload.
 - Frontend authorization logic remains backend-contract driven.
+- Current implementation note: `/demo/analysis` upgraded to tabs-first IA with persistent status/timeline, quant/decision tabs, and raw payload inspector.
 
 ---
 

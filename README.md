@@ -14,8 +14,8 @@ CFAI is currently structured as a frontend/backend split:
 
 - Module 1 (Hard Cutover and Pruning) is closed.
 - Execution focus has shifted to:
-  - Module 2 runtime foundation (docker compose + async DB baseline)
-  - Module 4 frontend flow rebuild on the new scaffold baseline
+  - Module 3 backend core hardening (projection read-model + workflow runtime checks)
+  - Module 4 frontend results UX glow-up (`/demo/analysis`, tabs-first IA)
 
 ## Quick Start
 
@@ -43,10 +43,10 @@ Migrations are intentionally manual (not auto-run on backend startup):
 
 ```bash
 # Create a migration
-docker compose run --rm backend alembic revision --autogenerate -m "describe_change"
+docker compose run --rm backend uv run alembic revision --autogenerate -m "describe_change"
 
 # Apply latest migrations
-docker compose run --rm backend alembic upgrade head
+docker compose run --rm backend uv run alembic upgrade head
 ```
 
 ### Host-Side Fallback (Without Docker)
@@ -63,7 +63,17 @@ uv run --directory backend uvicorn app.main:app --reload --host 0.0.0.0 --port 3
 - Frontend dependencies and scripts are managed with `pnpm` in `frontend/`.
 - Backend dependencies and runtime are managed with `uv` in `backend/`.
 - Backend DB stack uses async SQLAlchemy + Alembic.
+- Workflow runtime/domain layout:
+  - shared runtime primitives: `backend/app/core/workflow/`
+  - analysis workflow domain: `backend/app/workflows/analysis/`
+  - maintenance seed/sync domain: `backend/app/workflows/maintenance/`
 - Progress and module checkpoints live in `.cursor/memories/roadmap.md`.
+
+### Test/CI Knob (analysis)
+
+- Set `SKIP_DEEP_RESEARCH_IN_TESTS=true` to bypass live deep-research calls in integration tests.
+- In skip mode, workflow seeds `reportMarkdown` from latest persisted completed payload for the same symbol and emits `deep_research_skipped_fixture`.
+- Keep at least one periodic/manual full live run without this flag to detect provider drift.
 
 ## License
 
