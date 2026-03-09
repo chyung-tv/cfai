@@ -1,224 +1,77 @@
-# CFAI Roadmap and Progress Tracker
+# CFAI Roadmap
 
-Last updated: 2026-03-04 (ADR-0008 implementation validated with migration + container restart)
-Purpose: execution tracker only (progress, sequencing, checkpoints, acceptance).
+Last validated: 2026-03-09 (blueprint canonicalized)
+Purpose: single source of execution status and next actions.
 
----
-
-## Progress Tracker
-
-### Module Status
-
-- [x] Module 1 - Hard Cutover and Pruning (completed)
-- [x] Module 2 - Containerized Runtime Foundation (Docker + PostgreSQL) (completed)
-- [ ] Module 3 - Backend Core (FastAPI Workflow, Auth, RBAC, Quota)
-- [ ] Module 4 - Frontend Adaptation (Readability and UX Integration) (active)
-- [ ] Module 5 - Phase 1 Completion Gate
-
-### Current Focus
-
-- Active module: Module 3 + Module 4 execution slice (projection read-model + results UI)
-- Current owner: user + coding agent
-- Next acceptance checkpoint: verify projection-backed read parity and tabs-first `/demo/analysis` UX under live SSE transitions.
-- Blockers: see `./debuglog.md`
-
-### Session Briefing (for every new agent session)
-
-Use this response order:
+## Session Briefing (mandatory order)
 
 1. Where we are at
 2. What we need to implement next
 3. What we just implemented
 
-Keep this block updated:
-
-- Where we are at: Modules 1 and 2 are complete; Module 3 remains active with projection-backed read path now implemented; Module 4 is active with tabs-first results page upgrade landed.
-- What we need to implement next: complete full frontend acceptance validation on live user tests (`/demo/analysis`) and close remaining Module 3/4 acceptance checklist items.
-- What we just implemented: added `analysis_workflow_projections` table + projection normalizer/write hooks (`emit`, artifact persistence, manual fail path), refactored `/demo/analysis` into a tabs-first interactive readability-focused UI, and validated rollout by applying migration + restarting Docker runtime with healthy backend/db endpoints.
-
-### Execution Notes
-
-- `roadmap.md` tracks execution state only.
-- Architecture snapshot lives in `./architecture.md`.
-- Architecture decision rationale log lives in `./architecture-decisions.md`.
-- Record unresolved issues in `./debuglog.md`.
-- Record resolved lessons in `./memo.md`.
-
----
-
-## Phase-to-Architecture Mapping
-
-- Module 2 runtime foundation -> `./architecture.md#2-component-topology`
-- Module 3.1 auth/rbac/quota -> `./architecture.md#6-auth-rbac-and-quota-boundary`
-- Module 3.1B maintenance workflow -> `./architecture.md#31-maintenance-workflow-domain`
-- Module 3.3 analysis workflow -> `./architecture.md#32-analysis-workflow-domain`
-- Module 3.4 persistence/cache -> `./architecture.md#4-data-architecture`
-- Module 4 frontend adaptation -> `./architecture.md#2-component-topology`
-
-## Phase-to-Decision Mapping
-
-- Workflow isolation decision -> `./architecture-decisions.md#adr-0001-split-runtime-into-maintenance-and-analysis-workflow-domains`
-- Ingestion-first sequencing -> `./architecture-decisions.md#adr-0002-ingestion-first-sequencing-before-resolve_query-implementation`
-- S&P500-first seed scope -> `./architecture-decisions.md#adr-0003-v1-catalog-seed-scope-is-sp500-first`
-- Starter-plan top500-us seed proxy -> `./architecture-decisions.md#adr-0006-starter-plan-seed-universe-uses-directoryscreener-top-500-us-proxy`
-- Deep-research payload persistence v1 -> `./architecture-decisions.md#adr-0007-v1-deep-research-payload-persists-as-markdown-first-with-embedded-citations`
-- Frontend projection read-model optimization -> `./architecture-decisions.md#adr-0008-add-frontend-optimized-workflow-projection-read-model`
-- Auth sequencing -> `./architecture-decisions.md#adr-0004-auth-implementation-sequencing-defers-firebase-option-b-pivot`
-- Hybrid read-path direction -> `./architecture-decisions.md#adr-0005-read-path-direction-is-hybrid-projection-table-is-target-read-model`
-
----
-
-## Module 1) Hard Cutover and Pruning
-
-Status: completed
-
-### Acceptance criteria (completed)
-
-- No active runtime dependency on Motia/Turbo paths.
-- Frontend no longer requires direct business DB access path for auth/analysis control.
-- Repository tree reflects `/frontend` and `/backend` as primary executables.
-
----
-
-## Module 2) Containerized Runtime Foundation (Docker + PostgreSQL)
-
-Status: completed
-
-### Acceptance criteria (completed)
-
-- Single command brings up all services.
-- Backend can connect/migrate DB and pass health checks.
-- Frontend can call backend over compose network/ingress.
-
----
-
-## Module 3) Backend Core (FastAPI Workflow, Auth, RBAC, Quota)
-
-Status: active
-
-Architecture mapping: `./architecture.md#3-workflow-domains`, `./architecture.md#4-data-architecture`, `./architecture.md#6-auth-rbac-and-quota-boundary`  
-Decision references: `./architecture-decisions.md#accepted-decisions`
-
-### 3.1 Auth and Session Submodule
-
-Execution goal:
-
-- Maintain current backend session-based auth path while analysis workflow is being materialized.
-- Enforce backend auth/rbac/quota boundary contracts.
-
-Current sequencing note:
-
-- Firebase Option B pivot is deferred until workflow core stability checkpoint.
-
-### 3.1B Maintenance Workflow Submodule (catalog ingestion)
-
-Execution goal:
-
-- Implement standalone `maintenance` workflow domain for stock catalog ingestion.
-
-Immediate step order:
-
-1. Implement seed run path for S&P500 universe (~500 symbols).
-2. Persist stock catalog with deterministic normalization and idempotent upsert.
-3. Validate seeded catalog quality (uniqueness, normalization, active/search fitness).
-4. Define weekly refresh run contract.
-
-Acceptance checkpoint:
-
-- one-time seed run contract is implemented and verifiable
-- seeded catalog quality gate passes
-- maintenance run is isolated from analysis orchestration path
-
-### 3.3 Analysis Workflow Submodule
-
-Execution goal:
-
-- Materialize analysis state machine after catalog seed validation.
-
-Immediate step order:
-
-1. Implement `resolve_query` against seeded catalog shape. (completed)
-2. Implement `deep_research` node and persist report payload. (completed)
-3. Implement `structured_output` on top of deep research output. (completed)
-3b. Finalize fixed UI-first `structured_output` schema and remove dynamic runtime shape. (completed)
-4. Implement `reverse_dcf` and continue node-by-node sequence. (completed)
-5. Implement `audit_growth_likelihood` and continue node-by-node sequence. (completed)
-6. Implement `advisor_decision` and continue node-by-node sequence. (completed)
-7. Preserve event persistence + SSE semantics. (in progress)
-8. Prototype milestone: workflow output and demo rendering are satisfactory for current iteration. (completed)
-
-Acceptance checkpoint:
-
-- trigger -> transitions -> SSE -> persisted results works end-to-end
-- resolver behavior is deterministic for v1 scope
-- deep research report payload is persisted and reusable by downstream nodes
-
-### 3.4 Persistence and Cache Submodule
-
-Execution goal:
-
-- Complete persistence model required by maintenance + analysis domains.
-
-Immediate step order:
-
-1. Finalize `stock_catalog` for maintenance workflow.
-2. Finalize analysis tables/contracts (`analysis_workflows`, `events`, `artifacts`).
-3. Keep cache-key/artifact-key contracts consistent with architecture snapshot.
-4. Projection read-model table for frontend one-call retrieval implemented (ADR-0008 accepted); next step is runtime hardening and acceptance verification.
-
-### 3.5 RBAC and Quota Submodule
-
-Execution goal:
-
-- Enforce backend policy controls for analysis trigger paths.
-
-Guard order:
-
-1. `require_auth`
-2. `require_role`
-3. `require_analysis_quota` (trigger route)
-
-### Module 3 acceptance criteria
-
-- Authenticated user can trigger workflow via backend API.
-- Workflow transitions persist and stream via SSE.
-- Final results persist and are queryable.
-- RBAC/quota enforcement is active and observable.
-
----
-
-## Module 4) Frontend Adaptation (Readability and UX Integration)
-
-Status: active
-
-Architecture mapping: `./architecture.md#2-component-topology`, `./architecture.md#5-api-and-event-boundaries`, `./architecture.md#92-frontend-uiux-baseline-integrated`
-
-Execution goal:
-
-- Frontend consumes backend auth and workflow outputs with no legacy ownership paths.
-
-### Acceptance criteria
-
-- Frontend can trigger analysis and display live progress.
-- Frontend can fetch and render final readable result payload.
-- Frontend authorization logic remains backend-contract driven.
-- Current implementation note: `/demo/analysis` upgraded to tabs-first IA with persistent status/timeline, quant/decision tabs, and raw payload inspector.
-
----
-
-## Module 5) Phase 1 Completion Gate
-
-Status: pending
-
-Phase 1 is complete only when all module criteria are met end-to-end:
-
-- trigger analysis -> observe SSE states -> read final result
-- auth/rbac/quota enforced at backend boundary
-- cache behavior consistent with key contract
-- legacy paths pruned per hard cutover policy
-
----
-
-## Phase 2 (Vision Only)
-
-- Portfolio builder vision and recommendation loops begin after Phase 1 stabilization.
+- Where we are at: Modules 1-2 are complete; core analysis workflow + projection read model + demo UI are implemented and usable locally.
+- What we need to implement next: execute the next blueprint stage from `product-blueprint.md`.
+- What we just implemented: consolidated product-definition content into canonical blueprint and reduced duplicate specs in other memories.
+
+## Module Status
+
+- [x] Module 1 - Hard cutover and pruning
+- [x] Module 2 - Containerized runtime foundation
+- [~] Module 3 - Backend core (workflow + auth/rbac/quota) *(active)*
+- [~] Module 4 - Frontend adaptation *(active)*
+- [ ] Module 5 - Phase 1 completion gate
+
+## Reality Check (2026-03-09)
+
+- Backend analysis workflow exists end-to-end: `resolve_query` -> `deep_research` -> `structured_output` -> `reverse_dcf` -> `audit_growth_likelihood` -> `advisor_decision`.
+- Projection read model exists and `/analysis/latest` reads from `analysis_workflow_projections` with fallback.
+- Maintenance seed domain exists with admin endpoints and run tracking.
+- Frontend `/demo/analysis` exists with tabs-first IA and SSE timeline.
+- Quota guard is not implemented in backend yet.
+- Auth is enforced on trigger, but not consistently enforced across all analysis read/event routes.
+
+## Current Focus
+
+- Active slice: Product experience milestone (research hub + compare table).
+- Owners: user + coding agent.
+- Blockers: see `./debuglog.md`.
+
+## Next Execution Queue
+
+1. Execute Stage 0 from `./product-blueprint.md`.
+2. Execute Stage 1 from `./product-blueprint.md`.
+3. Execute Stage 2 from `./product-blueprint.md`.
+4. Execute Stage 3 from `./product-blueprint.md`.
+5. Execute Stage 4 from `./product-blueprint.md`.
+6. Run local acceptance checks per stage and record outcomes here.
+
+## Phase Acceptance Gates
+
+### Module 3 Gate
+- Trigger path is stable for local use; policy hardening remains explicitly deferred in this milestone.
+- Transitions persist and stream via SSE.
+- Final artifacts/results are durable and queryable.
+
+### Module 4 Gate
+- Frontend trigger + live progress + blueprint-defined summary/drill-down rendering works from backend contracts only.
+- UX remains readable and stable for partial/failed payloads.
+
+### Module 5 Gate (Phase 1 complete)
+- Research hub flow and lightweight compare flow both pass in one verified local runbook.
+
+## Product Blueprint Reference
+
+- Canonical blueprint: `./product-blueprint.md`
+- This roadmap tracks execution status only; product definitions must live in blueprint.
+
+## Working Loop (context-optimized)
+
+1. **Brief** from this file in mandatory order.
+2. **Plan** only the active slice (avoid broad refactors).
+3. **Implement** focused changes.
+4. **Validate** with targeted runtime checks.
+5. **Record**:
+   - progress here
+   - rationale in `architecture-decisions.md` when decisions change
+   - blockers in `debuglog.md`
+   - reusable lessons in `memo.md`

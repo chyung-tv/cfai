@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 from collections.abc import AsyncGenerator
+from datetime import UTC, datetime, timedelta
+import copy
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -15,9 +17,30 @@ from app.models.workflow.analysis_workflow import AnalysisWorkflow
 from app.models.workflow.analysis_workflow_event import AnalysisWorkflowEvent
 from app.models.workflow.analysis_workflow_projection import AnalysisWorkflowProjection
 from app.models.user import User
+from app.workflows.analysis.projections.normalizer import normalize_projection_payload
 from app.workflows.analysis.projections.store import upsert_workflow_projection
 from app.workflows.analysis.orchestrator import WorkflowOrchestrator
 from app.workflows.analysis.sse import SseBroker
+
+ANALYSIS_FRESHNESS_TTL = timedelta(days=7)
+
+
+def _with_freshness(payload: dict[str, Any], updated_at: datetime | None) -> dict[str, Any]:
+    enriched = copy.deepcopy(payload)
+    summary = enriched.get("summary")
+    if not isinstance(summary, dict):
+        return enriched
+    freshness = summary.get("analysisFreshness")
+    if not isinstance(freshness, dict):
+        freshness = {}
+        summary["analysisFreshness"] = freshness
+
+    if updated_at is None:
+        freshness["isFresh"] = None
+        return enriched
+    threshold = datetime.now(UTC) - ANALYSIS_FRESHNESS_TTL
+    freshness["isFresh"] = updated_at >= threshold
+    return enriched
 
 
 class TriggerBody(BaseModel):
@@ -99,7 +122,12 @@ def create_workflow_router(
         )
         projection = result.scalar_one_or_none()
         if projection is not None:
-            return projection.result_payload
+            if isinstance(projection.result_payload, dict):
+                payload = projection.result_payload
+                if not isinstance(payload.get("summary"), dict):
+                    payload, _ = normalize_projection_payload(base_payload=payload)
+                return _with_freshness(payload, projection.updated_at)
+            return None
 
         # Backward-compatible fallback for rows created before projection table rollout.
         fallback = await db.execute(
@@ -114,7 +142,10 @@ def create_workflow_router(
         workflow = fallback.scalar_one_or_none()
         if workflow is None:
             return None
-        return workflow.result_payload
+        if not isinstance(workflow.result_payload, dict):
+            return None
+        fallback_payload, _ = normalize_projection_payload(base_payload=workflow.result_payload)
+        return _with_freshness(fallback_payload, workflow.updated_at)
 
     @router.get("/history")
     async def get_analysis_history(db: AsyncSession = Depends(get_db)) -> list[dict[str, Any]]:

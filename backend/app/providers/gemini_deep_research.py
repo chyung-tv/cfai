@@ -43,19 +43,31 @@ class GeminiDeepResearchClient:
         self,
         *,
         api_key: str,
+        app_env: str,
         agent: str,
+        deep_research_dev_model: str,
+        deep_research_dev_grounding_enabled: bool,
+        deep_research_use_endpoint_in_production: bool,
         structured_output_model: str,
         poll_interval_seconds: int,
         max_wait_seconds: int,
         enable_live_calls: bool,
     ) -> None:
         self._api_key = api_key
+        self._app_env = app_env
         self._agent = agent
+        self._deep_research_dev_model = deep_research_dev_model
+        self._deep_research_dev_grounding_enabled = deep_research_dev_grounding_enabled
+        self._deep_research_use_endpoint_in_production = deep_research_use_endpoint_in_production
         self._structured_output_model = structured_output_model
         self._poll_interval_seconds = max(1, poll_interval_seconds)
         self._max_wait_seconds = max(10, max_wait_seconds)
         self._enable_live_calls = enable_live_calls
         self._client: genai.Client | None = None
+
+    @property
+    def structured_output_model_name(self) -> str:
+        return self._structured_output_model
 
     async def run_report(self, *, prompt: str) -> DeepResearchResult:
         normalized_prompt = prompt.strip()
@@ -84,6 +96,28 @@ class GeminiDeepResearchClient:
                 "GOOGLE_API_KEY is not configured",
             )
 
+        if not self._use_deep_research_endpoint():
+            response = await asyncio.to_thread(
+                self._generate_content,
+                self._deep_research_dev_model,
+                normalized_prompt,
+                self._deep_research_dev_grounding_enabled,
+            )
+            report_markdown = self._extract_response_text(response)
+            if not report_markdown:
+                raise DeepResearchProviderError("empty_report", "flash-lite path returned no text")
+            return DeepResearchResult(
+                interaction_id="flash-lite-dev",
+                report_markdown=report_markdown,
+                citations=[],
+                model_metadata={
+                    "mode": "flash_lite",
+                    "model": self._deep_research_dev_model,
+                    "groundingEnabled": self._deep_research_dev_grounding_enabled,
+                    "status": "completed",
+                },
+            )
+
         interaction = await asyncio.to_thread(self._create_interaction, normalized_prompt)
         interaction_id = self._read_field(interaction, "id")
         if not interaction_id:
@@ -103,6 +137,7 @@ class GeminiDeepResearchClient:
                     report_markdown=report_markdown,
                     citations=citations,
                     model_metadata={
+                        "mode": "deep_research_endpoint",
                         "agent": self._agent,
                         "status": status,
                     },
@@ -171,9 +206,17 @@ class GeminiDeepResearchClient:
         )
 
     def _generate_structured_content(self, prompt: str) -> Any:
+        return self._generate_content(self._structured_output_model, prompt, False)
+
+    def _generate_content(self, model: str, prompt: str, enable_grounding: bool) -> Any:
+        config: dict[str, Any] | None = None
+        if enable_grounding:
+            # Dev/test grounding for flash-lite deep-research path.
+            config = {"tools": [{"google_search": {}}]}
         return self._get_client().models.generate_content(
-            model=self._structured_output_model,
+            model=model,
             contents=prompt,
+            config=config,
         )
 
     def _get_interaction(self, interaction_id: str) -> Any:
@@ -183,6 +226,11 @@ class GeminiDeepResearchClient:
         if self._client is None:
             self._client = genai.Client(api_key=self._api_key)
         return self._client
+
+    def _use_deep_research_endpoint(self) -> bool:
+        env = self._app_env.strip().lower()
+        is_prod = env in {"production", "prod"}
+        return is_prod and self._deep_research_use_endpoint_in_production
 
     @staticmethod
     def _read_field(obj: Any, field: str) -> Any:

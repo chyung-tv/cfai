@@ -35,7 +35,11 @@ fmp_client = FmpClient(
 )
 gemini_client = GeminiDeepResearchClient(
     api_key=settings.google_api_key,
+    app_env=settings.app_env,
     agent=settings.deep_research_agent,
+    deep_research_dev_model=settings.deep_research_dev_model,
+    deep_research_dev_grounding_enabled=settings.deep_research_dev_grounding_enabled,
+    deep_research_use_endpoint_in_production=settings.deep_research_use_endpoint_in_production,
     structured_output_model=settings.structured_output_model,
     poll_interval_seconds=settings.deep_research_poll_interval_seconds,
     max_wait_seconds=settings.deep_research_max_wait_seconds,

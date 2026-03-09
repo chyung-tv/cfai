@@ -1,48 +1,36 @@
 # Debug Log
 
-Purpose: track active bugs, attempts, outcomes, and next actions.
+Purpose: only unresolved, reproducible blockers that can stall roadmap progress.
 
-## Active Bugs
+## Active
 
-Use one entry per active bug.
+### [MOD3-POLICY-001] Quota enforcement missing on analysis trigger
+- Status: `active`
+- Scope: backend policy boundary (`/analysis/trigger`)
+- Repro:
+  1. inspect backend app for quota guard
+  2. no quota dependency/middleware exists
+- Expected: auth -> role -> quota sequence enforced for trigger flows.
+- Actual: auth exists; quota layer is absent.
+- Next: implement quota guard contract and wire it in trigger path.
+- Owner: user + coding agent
 
-### Template
+### [MOD3-POLICY-002] Analysis read/event route auth policy is undefined in code
+- Status: `active`
+- Scope: `/analysis/latest`, `/analysis/events`, `/analysis/events/stream`
+- Repro:
+  1. inspect workflow router dependencies
+  2. endpoints above can be called without `require_auth`
+- Expected: explicit and consistent policy decision (public or auth-required) with enforcement.
+- Actual: policy is implicit and inconsistent with Module 3 acceptance intent.
+- Next: decide policy and enforce in router.
+- Owner: user + coding agent
 
-#### [BUG-ID] Short title
-- Status: `active` | `blocked` | `resolved`
-- Scope: affected modules/files/features
-- Repro steps:
-  1. ...
-  2. ...
-- Expected:
-- Actual:
-- Root-cause hypothesis:
-- Attempt history:
-  - YYYY-MM-DD HH:MM - Attempt summary - Result
-- Next attempt:
-- Owner:
+## Recently Resolved
 
----
+- [MOD2-DEVX-001] Frontend compose reinstall loop fixed by guarded install + stable pnpm store.
+- [MOD1-VAL-001] Validation/tooling mismatch superseded by re-baseline.
+- [MOD1-CLEANUP-001] Legacy Motia references no longer runtime blockers.
 
-## Resolved Bugs (Recent)
-
-Move finished items here with a short note and link to any lesson in `memo.md`.
-
-#### [MOD2-DEVX-001] Frontend compose reinstall loop caused slow or faulty startup perception
-- Resolved on: 2026-02-26
-- Resolution summary: replaced forced `pnpm install --force` startup with guarded install-if-missing flow and set `PNPM_STORE_DIR=/pnpm/store`; frontend now reaches ready state immediately on restart once dependencies are present.
-- Preventive note: avoid unconditional dependency reinstalls in container startup commands for hot-reload dev services.
-- Related memo: `./memo.md#2026-02-26---frontend-compose-startup-stabilization-pnpm-store--no-reinstall-loop`
-
-#### [MOD1-VAL-001] Validation tools unavailable in current environment
-- Resolved on: 2026-02-26
-- Resolution summary: superseded by frontend re-bootstrap and package-manager standardization (`pnpm` in `frontend`, `uv` in `backend`), with dependency install/run commands updated in `README.md`.
-- Preventive note: after scaffold resets, retire stale validation bug entries and re-open only if reproducible on current toolchain.
-- Related memo: `./memo.md#2026-02-26---frontend-rebootstrap-and-module-1-closure-rebaseline`
-
-#### [MOD1-CLEANUP-001] Residual legacy Motia references outside active runtime paths
-- Resolved on: 2026-02-26
-- Resolution summary: treated as no longer blocking Module 1 closure after repository re-baseline; residual mentions are documentation-only and not runtime dependencies.
-- Preventive note: evaluate legacy string references by runtime impact first, not by raw text-match count.
-- Related memo: `./memo.md#2026-02-26---frontend-rebootstrap-and-module-1-closure-rebaseline`
+For reusable lessons, see `./memo.md`.
 

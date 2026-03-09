@@ -5,16 +5,16 @@ alwaysApply: true
 
 # Implementation Core Rules
 
-1. At the start of each new session, read `.cursor/memories/roadmap.md` and provide status in this order:
+1. At the start of each new session, read `.cursor/memories/roadmap.md` and brief in this order:
    - where we are at
    - what we need to implement next
    - what we just implemented
-   Then consult `.cursor/memories/architecture.md` for target design and `.cursor/memories/architecture-decisions.md` for accepted decision rationale when planning implementation details.
-2. After the status briefing, collaborate with the user on detailed module execution planning before coding non-trivial work.
+2. Before non-trivial coding, consult `.cursor/memories/product-blueprint.md` (canonical product target), `.cursor/memories/architecture.md` (system target), and `.cursor/memories/architecture-decisions.md` (accepted rationale), then align plan with user.
 3. Keep changes focused and minimal. Avoid broad refactors unless required by active roadmap scope.
 4. Reuse existing project patterns/components before adding new abstractions.
 5. Do not silently change architecture decisions in `architecture.md`/`architecture-decisions.md`; document any justified deviation and reflect execution impact in roadmap.
-6. Validate behavior after edits, but default to ephemeral checks:
+6. Follow the working loop: brief -> plan -> implement -> validate -> record.
+7. Validate behavior after edits, but default to ephemeral checks:
    - preferred: CLI runs, targeted commands, one-off temporary scripts
    - avoid: creating persisted test files unless explicitly requested by user
-7. If validation is incomplete, clearly report what was not verified and why.
+8. If validation is incomplete, clearly report what was not verified and why.

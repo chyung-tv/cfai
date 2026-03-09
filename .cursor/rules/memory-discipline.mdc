@@ -9,7 +9,8 @@ alwaysApply: true
 2. When starting or switching major tasks, update current focus and module status in roadmap memory.
 3. Treat `.cursor/memories/architecture.md` as the latest agreed architecture snapshot (target system shape).
 4. Treat `.cursor/memories/architecture-decisions.md` as the architecture decision log (rationale and tradeoffs).
-5. Keep the `Session Briefing` block in roadmap current so any new agent can report status immediately.
-6. For unresolved defects or blockers, log reproducible details in `.cursor/memories/debuglog.md`.
-7. When an issue is resolved, record reusable lessons in `.cursor/memories/memo.md`.
-8. Link entries across memories when relevant (roadmap <-> architecture <-> architecture-decisions <-> debuglog <-> memo) to preserve traceability.
+5. Keep the `Session Briefing` block in roadmap current and concise; this is the default context handoff.
+6. Put unresolved reproducible blockers only in `.cursor/memories/debuglog.md`.
+7. Put reusable lessons only in `.cursor/memories/memo.md`.
+8. Treat `.cursor/memories/product-blueprint.md` as the canonical product definition (intent, UX behavior, staged delivery).
+9. Avoid duplication across memory files; each fact should have one home and references elsewhere.

@@ -139,14 +139,14 @@ class AuditGrowthLikelihoodNode(BaseNode):
         model_metadata = result.get("modelMetadata")
         if isinstance(model_metadata, dict):
             model_metadata["auditGrowthLikelihood"] = {
-                "model": "gemini-2.5-flash",
+                "model": self._client.structured_output_model_name,
                 "mode": "structured_json",
                 "projectionYears": projection_years,
             }
         else:
             result["modelMetadata"] = {
                 "auditGrowthLikelihood": {
-                    "model": "gemini-2.5-flash",
+                    "model": self._client.structured_output_model_name,
                     "mode": "structured_json",
                     "projectionYears": projection_years,
                 }

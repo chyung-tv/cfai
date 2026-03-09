@@ -50,14 +50,14 @@ class StructuredOutputNode(BaseNode):
         if isinstance(model_metadata, dict):
             model_metadata["structuredOutput"] = {
                 "mode": "fixed_llm",
-                "model": "gemini-2.5-flash",
+                "model": self._client.structured_output_model_name,
                 "schemaVersion": structured_output.get("schemaVersion"),
             }
         else:
             result["modelMetadata"] = {
                 "structuredOutput": {
                     "mode": "fixed_llm",
-                    "model": "gemini-2.5-flash",
+                    "model": self._client.structured_output_model_name,
                     "schemaVersion": structured_output.get("schemaVersion"),
                 }
             }

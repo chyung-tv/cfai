@@ -152,14 +152,14 @@ class AdvisorDecisionNode(BaseNode):
         model_metadata = result.get("modelMetadata")
         if isinstance(model_metadata, dict):
             model_metadata["advisorDecision"] = {
-                "model": "gemini-2.5-flash",
+                "model": self._client.model_name,
                 "mode": "structured_json",
                 "projectionYears": projection_years,
             }
         else:
             result["modelMetadata"] = {
                 "advisorDecision": {
-                    "model": "gemini-2.5-flash",
+                    "model": self._client.model_name,
                     "mode": "structured_json",
                     "projectionYears": projection_years,
                 }

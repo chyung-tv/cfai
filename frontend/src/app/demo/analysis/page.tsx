@@ -113,30 +113,36 @@ export default function AnalysisDemoPage() {
   const [liveEvents, setLiveEvents] = useState<WorkflowEvent[]>([]);
   const eventSourceRef = useRef<EventSource | null>(null);
 
-  const structuredOutput = useMemo(
-    () => (payload?.structuredOutput as JsonObject | undefined) ?? null,
+  const detailsPayload = useMemo(
+    () => (payload?.details && typeof payload.details === "object" ? (payload.details as JsonObject) : payload),
     [payload],
+  );
+  const structuredOutput = useMemo(
+    () => (detailsPayload?.structuredOutput as JsonObject | undefined) ?? null,
+    [detailsPayload],
   );
   const reportMarkdown = useMemo(
-    () => (typeof payload?.reportMarkdown === "string" ? payload.reportMarkdown : null),
-    [payload],
+    () => (typeof detailsPayload?.reportMarkdown === "string" ? detailsPayload.reportMarkdown : null),
+    [detailsPayload],
   );
   const citations = useMemo(
-    () => (Array.isArray(payload?.citations) ? payload.citations : null),
-    [payload],
+    () => (Array.isArray(detailsPayload?.citations) ? detailsPayload.citations : null),
+    [detailsPayload],
   );
   const reverseDcf = useMemo(
-    () => (payload?.reverseDcf as JsonObject | undefined) ?? null,
-    [payload],
+    () => (detailsPayload?.reverseDcf as JsonObject | undefined) ?? null,
+    [detailsPayload],
   );
   const auditGrowth = useMemo(
-    () => (payload?.auditGrowthLikelihood as JsonObject | undefined) ?? null,
-    [payload],
+    () => (detailsPayload?.auditGrowthLikelihood as JsonObject | undefined) ?? null,
+    [detailsPayload],
   );
   const advisorDecision = useMemo(
-    () => (payload?.advisorDecision as JsonObject | undefined) ?? null,
-    [payload],
+    () => (detailsPayload?.advisorDecision as JsonObject | undefined) ?? null,
+    [detailsPayload],
   );
+  const structuredOutputAny = structuredOutput as Record<string, any> | null;
+  const reverseDcfAny = reverseDcf as Record<string, any> | null;
   const auditCases = useMemo(() => {
     const maybe = auditGrowth?.cases;
     return Array.isArray(maybe) ? (maybe as CaseItem[]) : [];
@@ -399,42 +405,42 @@ export default function AnalysisDemoPage() {
                     <div className="space-y-2 rounded-lg border border-zinc-200 p-4 dark:border-zinc-800">
                       <p className="text-sm font-semibold">Executive Summary</p>
                       <p className="text-sm leading-6">
-                        {String((structuredOutput as JsonObject)?.executiveSummary?.summary ?? "N/A")}
+                        {String(structuredOutputAny?.executiveSummary?.summary ?? "N/A")}
                       </p>
                       <p className="text-sm text-zinc-600 dark:text-zinc-400">
-                        Lifeline: {String((structuredOutput as JsonObject)?.executiveSummary?.lifeline ?? "N/A")}
+                        Lifeline: {String(structuredOutputAny?.executiveSummary?.lifeline ?? "N/A")}
                       </p>
                     </div>
                     <div className="space-y-2 rounded-lg border border-zinc-200 p-4 dark:border-zinc-800">
                       <p className="text-sm font-semibold">Management Profile</p>
                       <p className="text-sm leading-6">
-                        {String((structuredOutput as JsonObject)?.managementProfile?.leadershipSummary ?? "N/A")}
+                        {String(structuredOutputAny?.managementProfile?.leadershipSummary ?? "N/A")}
                       </p>
                       <details>
                         <summary className="cursor-pointer text-sm font-semibold">Key People</summary>
                         <pre className="overflow-x-auto pt-2 text-xs">
-                          {pretty((structuredOutput as JsonObject)?.managementProfile?.keyPeople ?? [])}
+                          {pretty(structuredOutputAny?.managementProfile?.keyPeople ?? [])}
                         </pre>
                       </details>
                     </div>
                     <div className="space-y-2 rounded-lg border border-zinc-200 p-4 dark:border-zinc-800">
                       <p className="text-sm font-semibold">Business Quality</p>
                       <p className="text-sm">
-                        Tier: {String((structuredOutput as JsonObject)?.businessQuality?.qualityTier ?? "N/A")}
+                        Tier: {String(structuredOutputAny?.businessQuality?.qualityTier ?? "N/A")}
                       </p>
                       <p className="text-sm font-semibold">Moat</p>
-                      {renderList(((structuredOutput as JsonObject)?.businessQuality?.moat as string[]) ?? [])}
+                      {renderList((structuredOutputAny?.businessQuality?.moat as string[]) ?? [])}
                     </div>
                     <div className="space-y-2 rounded-lg border border-zinc-200 p-4 dark:border-zinc-800">
                       <p className="text-sm font-semibold">Industry Profile</p>
                       <p className="text-sm">
-                        Market Structure: {String((structuredOutput as JsonObject)?.industryProfile?.marketStructure ?? "N/A")}
+                        Market Structure: {String(structuredOutputAny?.industryProfile?.marketStructure ?? "N/A")}
                       </p>
                       <p className="text-sm">
-                        Position: {String((structuredOutput as JsonObject)?.industryProfile?.position ?? "N/A")}
+                        Position: {String(structuredOutputAny?.industryProfile?.position ?? "N/A")}
                       </p>
                       <p className="text-sm leading-6">
-                        {String((structuredOutput as JsonObject)?.industryProfile?.positionRationale ?? "N/A")}
+                        {String(structuredOutputAny?.industryProfile?.positionRationale ?? "N/A")}
                       </p>
                     </div>
                   </div>
@@ -509,26 +515,26 @@ export default function AnalysisDemoPage() {
                         <div className="rounded-lg border border-zinc-200 p-3 text-sm dark:border-zinc-800">
                           <p className="text-zinc-500 dark:text-zinc-400">Optimistic CAGR</p>
                           <p className="text-lg font-semibold">
-                            {String((reverseDcf as JsonObject)?.summary?.bestCaseRevenueCagrPct ?? "N/A")}%
+                            {String(reverseDcfAny?.summary?.bestCaseRevenueCagrPct ?? "N/A")}%
                           </p>
                         </div>
                         <div className="rounded-lg border border-zinc-200 p-3 text-sm dark:border-zinc-800">
                           <p className="text-zinc-500 dark:text-zinc-400">Median CAGR</p>
                           <p className="text-lg font-semibold">
-                            {String((reverseDcf as JsonObject)?.summary?.medianRevenueCagrPct ?? "N/A")}%
+                            {String(reverseDcfAny?.summary?.medianRevenueCagrPct ?? "N/A")}%
                           </p>
                         </div>
                         <div className="rounded-lg border border-zinc-200 p-3 text-sm dark:border-zinc-800">
                           <p className="text-zinc-500 dark:text-zinc-400">Conservative CAGR</p>
                           <p className="text-lg font-semibold">
-                            {String((reverseDcf as JsonObject)?.summary?.worstCaseRevenueCagrPct ?? "N/A")}%
+                            {String(reverseDcfAny?.summary?.worstCaseRevenueCagrPct ?? "N/A")}%
                           </p>
                         </div>
                       </div>
                       <details>
                         <summary className="cursor-pointer text-sm font-semibold">Scenario Grid</summary>
                         <pre className="max-h-[420px] overflow-auto pt-2 text-xs">
-                          {pretty((reverseDcf as JsonObject)?.scenarioGrid ?? [])}
+                          {pretty(reverseDcfAny?.scenarioGrid ?? [])}
                         </pre>
                       </details>
                     </div>

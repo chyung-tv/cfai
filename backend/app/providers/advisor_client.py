@@ -11,5 +11,9 @@ class AdvisorClient:
     def __init__(self, *, gemini_client: GeminiDeepResearchClient) -> None:
         self._gemini_client = gemini_client
 
+    @property
+    def model_name(self) -> str:
+        return self._gemini_client.structured_output_model_name
+
     async def generate_advisor_decision(self, *, prompt: str) -> dict[str, Any]:
         return await self._gemini_client.generate_json_object(prompt=prompt)

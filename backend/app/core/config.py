@@ -23,6 +23,7 @@ def _as_bool(name: str, default: bool) -> bool:
 
 @dataclass(frozen=True)
 class Settings:
+    app_env: str = os.getenv("APP_ENV", "development")
     database_url: str = os.getenv(
         "DATABASE_URL",
         "postgresql+asyncpg://cfai:cfai@localhost:5432/cfai",
@@ -46,7 +47,23 @@ class Settings:
         "DEEP_RESEARCH_AGENT",
         "deep-research-pro-preview-12-2025",
     )
-    structured_output_model: str = os.getenv("STRUCTURED_OUTPUT_MODEL", "gemini-2.5-flash")
+    llm_flash_lite_model: str = os.getenv("LLM_FLASH_LITE_MODEL", "gemini3.1-flash-lite")
+    structured_output_model: str = os.getenv(
+        "STRUCTURED_OUTPUT_MODEL",
+        os.getenv("LLM_FLASH_LITE_MODEL", "gemini3.1-flash-lite"),
+    )
+    deep_research_dev_model: str = os.getenv(
+        "DEEP_RESEARCH_DEV_MODEL",
+        os.getenv("LLM_FLASH_LITE_MODEL", "gemini3.1-flash-lite"),
+    )
+    deep_research_dev_grounding_enabled: bool = _as_bool(
+        "DEEP_RESEARCH_DEV_GROUNDING_ENABLED",
+        True,
+    )
+    deep_research_use_endpoint_in_production: bool = _as_bool(
+        "DEEP_RESEARCH_USE_ENDPOINT_IN_PRODUCTION",
+        True,
+    )
     deep_research_poll_interval_seconds: int = _as_int("DEEP_RESEARCH_POLL_INTERVAL_SECONDS", 10)
     deep_research_max_wait_seconds: int = _as_int("DEEP_RESEARCH_MAX_WAIT_SECONDS", 1200)
     deep_research_enable_live_calls: bool = _as_bool("DEEP_RESEARCH_ENABLE_LIVE_CALLS", False)
