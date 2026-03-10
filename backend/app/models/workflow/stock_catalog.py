@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from sqlalchemy import BigInteger, Boolean, DateTime, ForeignKey, Integer, String, func
+from sqlalchemy import BigInteger, Boolean, CheckConstraint, DateTime, ForeignKey, Index, Integer, String, func
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base
@@ -10,6 +10,18 @@ from app.db.base import Base
 
 class StockCatalog(Base):
     __tablename__ = "stock_catalog"
+    __table_args__ = (
+        CheckConstraint("symbol = UPPER(symbol)", name="ck_stock_catalog_symbol_upper"),
+        CheckConstraint(
+            "selection_rank IS NULL OR selection_rank > 0",
+            name="ck_stock_catalog_selection_rank_positive",
+        ),
+        CheckConstraint(
+            "market_cap IS NULL OR market_cap > 0",
+            name="ck_stock_catalog_market_cap_positive",
+        ),
+        Index("ix_stock_catalog_is_active", "is_active"),
+    )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     symbol: Mapped[str] = mapped_column(String(16), nullable=False, unique=True, index=True)

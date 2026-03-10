@@ -7,7 +7,7 @@ from datetime import UTC, datetime
 from typing import Any
 from uuid import uuid4
 
-from sqlalchemy import Select, desc, select
+from sqlalchemy import Select, desc, func, select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
@@ -19,6 +19,7 @@ from app.providers.fmp_client import FmpClient, FmpClientError
 TARGET_CATALOG_SIZE = 500
 PROFILE_COVERAGE_THRESHOLD = 0.90
 DEFAULT_PROFILE_CONCURRENCY = 10
+STALE_RUN_TIMEOUT_SECONDS = 60 * 15
 
 
 @dataclass(frozen=True)
@@ -42,8 +43,19 @@ class CatalogSeedService(BaseWorkflowRunner):
         self._tasks: set[asyncio.Task[None]] = set()
 
     async def start_top500_us_seed(self) -> str:
-        run_id = str(uuid4())
         async with self._session_factory() as db:
+            await self._recover_stale_runs(db)
+            existing_running = await db.execute(
+                select(CatalogSeedRun)
+                .where(CatalogSeedRun.status == "running")
+                .order_by(desc(CatalogSeedRun.started_at))
+                .limit(1)
+            )
+            running = existing_running.scalar_one_or_none()
+            if running is not None:
+                return running.id
+
+            run_id = str(uuid4())
             db.add(
                 CatalogSeedRun(
                     id=run_id,
@@ -58,6 +70,8 @@ class CatalogSeedService(BaseWorkflowRunner):
                         "limit": 5000,
                     },
                     expected_count=TARGET_CATALOG_SIZE,
+                    worker_id="seed-service-local",
+                    heartbeat_at=datetime.now(UTC),
                 )
             )
             await db.commit()
@@ -66,6 +80,24 @@ class CatalogSeedService(BaseWorkflowRunner):
         self._tasks.add(task)
         task.add_done_callback(self._tasks.discard)
         return run_id
+
+    async def _recover_stale_runs(self, db: AsyncSession) -> None:
+        threshold = datetime.now(UTC).timestamp() - STALE_RUN_TIMEOUT_SECONDS
+        result = await db.execute(select(CatalogSeedRun).where(CatalogSeedRun.status == "running"))
+        stale_runs: list[CatalogSeedRun] = []
+        for run in result.scalars().all():
+            heartbeat = run.heartbeat_at or run.updated_at
+            if heartbeat is None:
+                continue
+            if heartbeat.timestamp() < threshold:
+                stale_runs.append(run)
+        for run in stale_runs:
+            run.status = "failed"
+            run.error_code = "stale_run_recovered"
+            run.error_message = "Recovered stale running seed run"
+            run.finished_at = datetime.now(UTC)
+        if stale_runs:
+            await db.commit()
 
     async def list_runs(self, *, limit: int = 20) -> list[CatalogSeedRun]:
         async with self._session_factory() as db:
@@ -82,6 +114,7 @@ class CatalogSeedService(BaseWorkflowRunner):
 
     async def _execute_seed(self, run_id: str) -> None:
         try:
+            await self._heartbeat(run_id)
             directory_result = await self._fmp.fetch_stock_directory()
             screener_result = await self._fmp.fetch_company_screener(
                 country="US",
@@ -101,6 +134,7 @@ class CatalogSeedService(BaseWorkflowRunner):
                 )
 
             profiles, profile_endpoint = await self._fetch_profiles(selected)
+            await self._heartbeat(run_id)
             profile_coverage = len(profiles) / TARGET_CATALOG_SIZE
             if profile_coverage < PROFILE_COVERAGE_THRESHOLD:
                 raise FmpClientError(
@@ -113,6 +147,7 @@ class CatalogSeedService(BaseWorkflowRunner):
                 selected=selected,
                 profiles_by_symbol=profiles,
             )
+            await self._heartbeat(run_id)
             await self._mark_run_succeeded(
                 run_id=run_id,
                 selected_count=len(selected),
@@ -211,6 +246,7 @@ class CatalogSeedService(BaseWorkflowRunner):
             inserted_count = len(symbols) - len(existing_symbols)
             updated_count = len(existing_symbols)
 
+            rows_to_upsert: list[dict[str, Any]] = []
             for item in selected:
                 profile = profiles_by_symbol.get(item.symbol, {})
                 name_display = (
@@ -237,18 +273,44 @@ class CatalogSeedService(BaseWorkflowRunner):
                     "source_updated_at": datetime.now(UTC),
                     "seed_run_id": run_id,
                 }
+                rows_to_upsert.append(values)
 
-                stmt = insert(StockCatalog).values(**values)
-                update_map = {
-                    key: value
-                    for key, value in values.items()
-                    if key != "symbol"
-                }
-                stmt = stmt.on_conflict_do_update(
-                    index_elements=[StockCatalog.symbol],
-                    set_=update_map,
+            stmt = insert(StockCatalog).values(rows_to_upsert)
+            update_map = {
+                "name_display": stmt.excluded.name_display,
+                "name_normalized": stmt.excluded.name_normalized,
+                "exchange": stmt.excluded.exchange,
+                "exchange_short_name": stmt.excluded.exchange_short_name,
+                "country": stmt.excluded.country,
+                "sector": stmt.excluded.sector,
+                "industry": stmt.excluded.industry,
+                "market_cap": stmt.excluded.market_cap,
+                "is_active": stmt.excluded.is_active,
+                "selection_rank": stmt.excluded.selection_rank,
+                "selection_method": stmt.excluded.selection_method,
+                "source": stmt.excluded.source,
+                "source_updated_at": stmt.excluded.source_updated_at,
+                "seed_run_id": stmt.excluded.seed_run_id,
+                "updated_at": func.now(),
+            }
+            stmt = stmt.on_conflict_do_update(
+                index_elements=[StockCatalog.symbol],
+                set_=update_map,
+            )
+            await db.execute(stmt)
+
+            await db.execute(
+                StockCatalog.__table__.update()
+                .where(
+                    StockCatalog.source == "fmp",
+                    StockCatalog.symbol.notin_(symbols),
                 )
-                await db.execute(stmt)
+                .values(
+                    is_active=False,
+                    selection_rank=None,
+                    updated_at=func.now(),
+                )
+            )
 
             await db.commit()
         return inserted_count, updated_count
@@ -276,6 +338,7 @@ class CatalogSeedService(BaseWorkflowRunner):
             run.endpoint_usage = endpoint_usage
             run.error_code = None
             run.error_message = None
+            run.heartbeat_at = datetime.now(UTC)
             run.finished_at = datetime.now(UTC)
             await db.commit()
 
@@ -288,7 +351,18 @@ class CatalogSeedService(BaseWorkflowRunner):
             run.status = "failed"
             run.error_code = error_code
             run.error_message = error_message[:500]
+            run.heartbeat_at = datetime.now(UTC)
             run.finished_at = datetime.now(UTC)
+            await db.commit()
+
+    async def _heartbeat(self, run_id: str) -> None:
+        async with self._session_factory() as db:
+            result = await db.execute(select(CatalogSeedRun).where(CatalogSeedRun.id == run_id))
+            run = result.scalar_one_or_none()
+            if run is None:
+                return
+            run.heartbeat_at = datetime.now(UTC)
+            run.attempt_count = (run.attempt_count or 0) + 1
             await db.commit()
 
     @staticmethod

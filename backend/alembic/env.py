@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import os
 from logging.config import fileConfig
+from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 from alembic import context
 from sqlalchemy import pool
@@ -20,8 +21,23 @@ if config.config_file_name is not None:
 target_metadata = Base.metadata
 
 
+def normalize_database_url(raw: str) -> str:
+    value = (raw or "").strip()
+    if not value:
+        return ""
+    if value.startswith("postgresql://"):
+        value = "postgresql+asyncpg://" + value[len("postgresql://") :]
+    parts = urlsplit(value)
+    query_items = dict(parse_qsl(parts.query, keep_blank_values=True))
+    sslmode = query_items.pop("sslmode", None)
+    query_items.pop("channel_binding", None)
+    if sslmode and "ssl" not in query_items:
+        query_items["ssl"] = "require" if sslmode.lower() in {"require", "verify-full"} else sslmode
+    return urlunsplit((parts.scheme, parts.netloc, parts.path, urlencode(query_items), parts.fragment))
+
+
 def get_database_url() -> str:
-    return (
+    return normalize_database_url(
         os.getenv("DATABASE_URL_DIRECT")
         or os.getenv("DATABASE_URL")
         or config.get_main_option("sqlalchemy.url")

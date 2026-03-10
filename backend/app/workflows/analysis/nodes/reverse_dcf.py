@@ -2,11 +2,15 @@ from __future__ import annotations
 
 import asyncio
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from statistics import median
 from typing import Any
 
+from sqlalchemy import desc, select
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from app.core.workflow.base_node import BaseNode
+from app.models.workflow.fmp_symbol_snapshot import FmpSymbolSnapshot
 from app.providers.fmp_client import FmpClient, FmpClientError
 from app.workflows.analysis.context import WorkflowContext
 
@@ -40,6 +44,7 @@ class ReverseDcfNode(BaseNode):
     _DISCOUNT_RATES = (0.06, 0.07, 0.08, 0.09, 0.10)
     _TERMINAL_GROWTH_RATES = (0.02, 0.025, 0.03)
     _PROJECTION_YEARS = 10
+    _SNAPSHOT_TTL = timedelta(hours=24)
 
     def __init__(self, fmp_client: FmpClient) -> None:
         self._fmp_client = fmp_client
@@ -60,57 +65,103 @@ class ReverseDcfNode(BaseNode):
                 quarter_income_call,
                 quarter_cash_flow_call,
                 quarter_balance_call,
-                annual_income_call,
-                annual_cash_flow_call,
-                annual_balance_call,
             ) = await asyncio.gather(
-                self._fmp_client.fetch_quote(symbol),
-                self._fmp_client.fetch_profile_by_symbol(symbol),
-                self._fmp_client.fetch_income_statement(
-                    symbol,
+                self._fetch_dataset_cached(
+                    context=context,
+                    symbol=symbol,
+                    dataset_type="quote",
+                    period=None,
+                    fetcher=lambda: self._fmp_client.fetch_quote(symbol),
+                ),
+                self._fetch_dataset_cached(
+                    context=context,
+                    symbol=symbol,
+                    dataset_type="profile",
+                    period=None,
+                    fetcher=lambda: self._fmp_client.fetch_profile_by_symbol(symbol),
+                ),
+                self._fetch_dataset_cached(
+                    context=context,
+                    symbol=symbol,
+                    dataset_type="income_statement",
                     period="quarter",
-                    limit=4,
+                    fetcher=lambda: self._fmp_client.fetch_income_statement(
+                        symbol,
+                        period="quarter",
+                        limit=4,
+                    ),
                 ),
-                self._fmp_client.fetch_cash_flow_statement(
-                    symbol,
+                self._fetch_dataset_cached(
+                    context=context,
+                    symbol=symbol,
+                    dataset_type="cash_flow_statement",
                     period="quarter",
-                    limit=4,
+                    fetcher=lambda: self._fmp_client.fetch_cash_flow_statement(
+                        symbol,
+                        period="quarter",
+                        limit=4,
+                    ),
                 ),
-                self._fmp_client.fetch_balance_sheet_statement(
-                    symbol,
+                self._fetch_dataset_cached(
+                    context=context,
+                    symbol=symbol,
+                    dataset_type="balance_sheet_statement",
                     period="quarter",
-                    limit=1,
-                ),
-                self._fmp_client.fetch_income_statement(
-                    symbol,
-                    limit=1,
-                ),
-                self._fmp_client.fetch_cash_flow_statement(
-                    symbol,
-                    limit=1,
-                ),
-                self._fmp_client.fetch_balance_sheet_statement(
-                    symbol,
-                    limit=1,
+                    fetcher=lambda: self._fmp_client.fetch_balance_sheet_statement(
+                        symbol,
+                        period="quarter",
+                        limit=1,
+                    ),
                 ),
             )
         except FmpClientError as exc:
             raise RuntimeError(f"reverse_dcf_fmp_{exc.code}: {exc}") from exc
 
-        quote = quote_call.data[0] if quote_call.data else {}
-        profile = profile_call.data[0] if profile_call.data else {}
+        annual_income_call: list[dict[str, Any]] = []
+        annual_cash_flow_call: list[dict[str, Any]] = []
+        annual_balance_call: list[dict[str, Any]] = []
+        if len(quarter_income_call) < 4 or len(quarter_cash_flow_call) < 4 or len(quarter_balance_call) < 1:
+            try:
+                annual_income_call, annual_cash_flow_call, annual_balance_call = await asyncio.gather(
+                    self._fetch_dataset_cached(
+                        context=context,
+                        symbol=symbol,
+                        dataset_type="income_statement",
+                        period="annual",
+                        fetcher=lambda: self._fmp_client.fetch_income_statement(symbol, limit=1),
+                    ),
+                    self._fetch_dataset_cached(
+                        context=context,
+                        symbol=symbol,
+                        dataset_type="cash_flow_statement",
+                        period="annual",
+                        fetcher=lambda: self._fmp_client.fetch_cash_flow_statement(symbol, limit=1),
+                    ),
+                    self._fetch_dataset_cached(
+                        context=context,
+                        symbol=symbol,
+                        dataset_type="balance_sheet_statement",
+                        period="annual",
+                        fetcher=lambda: self._fmp_client.fetch_balance_sheet_statement(symbol, limit=1),
+                    ),
+                )
+            except FmpClientError as exc:
+                raise RuntimeError(f"reverse_dcf_fmp_{exc.code}: {exc}") from exc
+
+        quote = quote_call[0] if quote_call else {}
+        profile = profile_call[0] if profile_call else {}
         market = self._extract_market_inputs(
             quote=quote,
             profile=profile,
-            balance_rows=quarter_balance_call.data or annual_balance_call.data,
+            balance_rows=quarter_balance_call or annual_balance_call,
         )
 
         warnings: list[str] = []
         baseline, baseline_warnings = self._build_baseline(
-            quarter_income_rows=quarter_income_call.data,
-            quarter_cash_flow_rows=quarter_cash_flow_call.data,
-            annual_income_rows=annual_income_call.data,
-            annual_cash_flow_rows=annual_cash_flow_call.data,
+            quarter_income_rows=quarter_income_call,
+            quarter_cash_flow_rows=quarter_cash_flow_call,
+            annual_income_rows=annual_income_call,
+            annual_cash_flow_rows=annual_cash_flow_call,
         )
         warnings.extend(baseline_warnings)
 
@@ -191,6 +242,89 @@ class ReverseDcfNode(BaseNode):
         context["reverse_dcf"] = reverse_dcf_payload
         context["result"] = result
         return {"result": result, "reverseDcf": reverse_dcf_payload}
+
+    async def _fetch_dataset_cached(
+        self,
+        *,
+        context: WorkflowContext,
+        symbol: str,
+        dataset_type: str,
+        period: str | None,
+        fetcher,
+    ) -> list[dict[str, Any]]:
+        db = context.get("db")
+        if not isinstance(db, AsyncSession):
+            fetched = await fetcher()
+            return fetched.data
+        snapshot = await self._load_snapshot(
+            db=db,
+            symbol=symbol,
+            dataset_type=dataset_type,
+            period=period,
+        )
+        now = datetime.now(timezone.utc)
+        if snapshot is not None and snapshot.expires_at > now:
+            rows = snapshot.payload.get("rows") if isinstance(snapshot.payload, dict) else None
+            if isinstance(rows, list):
+                return [row for row in rows if isinstance(row, dict)]
+
+        fetched = await fetcher()
+        await self._save_snapshot(
+            db=db,
+            symbol=symbol,
+            catalog_id=context.get("catalog_id"),
+            dataset_type=dataset_type,
+            period=period,
+            endpoint=fetched.endpoint,
+            rows=fetched.data,
+            now=now,
+        )
+        return fetched.data
+
+    async def _load_snapshot(
+        self,
+        *,
+        db: AsyncSession,
+        symbol: str,
+        dataset_type: str,
+        period: str | None,
+    ) -> FmpSymbolSnapshot | None:
+        result = await db.execute(
+            select(FmpSymbolSnapshot)
+            .where(
+                FmpSymbolSnapshot.symbol == symbol,
+                FmpSymbolSnapshot.dataset_type == dataset_type,
+                FmpSymbolSnapshot.period == period,
+            )
+            .order_by(desc(FmpSymbolSnapshot.fetched_at))
+            .limit(1)
+        )
+        return result.scalar_one_or_none()
+
+    async def _save_snapshot(
+        self,
+        *,
+        db: AsyncSession,
+        symbol: str,
+        catalog_id: int | None,
+        dataset_type: str,
+        period: str | None,
+        endpoint: str,
+        rows: list[dict[str, Any]],
+        now: datetime,
+    ) -> None:
+        snapshot = FmpSymbolSnapshot(
+            symbol=symbol,
+            catalog_id=catalog_id,
+            dataset_type=dataset_type,
+            period=period,
+            endpoint=endpoint,
+            payload={"rows": rows},
+            fetched_at=now,
+            expires_at=now + self._SNAPSHOT_TTL,
+        )
+        db.add(snapshot)
+        await db.flush()
 
     def _build_baseline(
         self,

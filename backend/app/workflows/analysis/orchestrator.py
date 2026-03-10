@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import asyncio
-import copy
+from datetime import datetime, timezone
 from typing import Any
 from uuid import uuid4
 
@@ -12,6 +12,7 @@ from app.core.config import settings
 from app.core.workflow.runtime import WorkflowRuntime
 from app.core.workflow.types import WorkflowState
 from app.models.workflow.analysis_workflow import AnalysisWorkflow
+from app.models.workflow.analysis_symbol_snapshot import AnalysisSymbolSnapshot
 from app.providers.advisor_client import AdvisorClient
 from app.providers.fmp_client import FmpClient
 from app.providers.gemini_deep_research import GeminiDeepResearchClient
@@ -81,6 +82,21 @@ class WorkflowOrchestrator:
         self._track_task(task)
         return workflow_id
 
+    async def mark_workflow_failed(self, db: AsyncSession, workflow_id: str) -> bool:
+        result = await db.execute(select(AnalysisWorkflow).where(AnalysisWorkflow.id == workflow_id))
+        workflow = result.scalar_one_or_none()
+        if workflow is None:
+            return False
+        await self._runtime.fail(
+            db=db,
+            workflow=workflow,
+            substate="failed",
+            message="Marked failed manually",
+            error_code="manual_failure",
+            payload=None,
+        )
+        return True
+
     async def _run_workflow(self, workflow_id: str) -> None:
         from app.db.session import AsyncSessionLocal
 
@@ -117,6 +133,7 @@ class WorkflowOrchestrator:
                 )
                 await ResolveQueryNode().execute(context)
                 workflow.symbol = context["symbol"]
+                workflow.catalog_id = context.get("catalog_id")
                 await db.commit()
 
                 await self._runtime.emit(
@@ -126,6 +143,7 @@ class WorkflowOrchestrator:
                     "resolve_cache",
                     "Resolving cache",
                 )
+                await self._hydrate_cached_result(db=db, workflow=workflow, context=context)
                 cache_result = await ResolveCacheNode().execute(context)
                 if cache_result.get("cache_hit"):
                     await self._runtime.emit(
@@ -138,7 +156,6 @@ class WorkflowOrchestrator:
                     )
                     cached_result = context.get("cached_result")
                     if isinstance(cached_result, dict):
-                        workflow.result_payload = copy.deepcopy(cached_result)
                         await self._runtime.persist_artifact(
                             db,
                             workflow.id,
@@ -160,7 +177,6 @@ class WorkflowOrchestrator:
                     "Structuring deep research output",
                 )
                 output = await StructuredOutputNode(self._deep_research_client).execute(context)
-                workflow.result_payload = copy.deepcopy(output["result"])
                 await upsert_workflow_projection(db, workflow, message="Structured output persisted")
                 await self._runtime.persist_artifact(
                     db,
@@ -178,7 +194,6 @@ class WorkflowOrchestrator:
                     "Running reverse DCF calculation",
                 )
                 output = await ReverseDcfNode(self._fmp_client).execute(context)
-                workflow.result_payload = copy.deepcopy(output["result"])
                 await upsert_workflow_projection(db, workflow, message="Reverse DCF persisted")
                 await self._runtime.persist_artifact(
                     db,
@@ -196,7 +211,6 @@ class WorkflowOrchestrator:
                     "Auditing growth likelihood against deep research evidence",
                 )
                 output = await AuditGrowthLikelihoodNode(self._deep_research_client).execute(context)
-                workflow.result_payload = copy.deepcopy(output["result"])
                 await upsert_workflow_projection(
                     db, workflow, message="Audit growth likelihood persisted"
                 )
@@ -216,7 +230,6 @@ class WorkflowOrchestrator:
                     "Generating investor-profile advisor actions",
                 )
                 output = await AdvisorDecisionNode(self._advisor_client).execute(context)
-                workflow.result_payload = copy.deepcopy(output["result"])
                 await upsert_workflow_projection(db, workflow, message="Advisor decision persisted")
                 await self._runtime.persist_artifact(
                     db,
@@ -241,19 +254,20 @@ class WorkflowOrchestrator:
                     WorkflowState.completed,
                     "completed",
                     "Analysis completed",
-                    {"hasResult": workflow.result_payload is not None},
+                    {"hasResult": True},
                 )
             except Exception as exc:
                 # Keep DB writes safe: error_message column is VARCHAR(500).
                 workflow.error_message = str(exc)[:500]
+                workflow.error_code = "analysis_failed"
                 await db.commit()
-                await self._runtime.emit(
+                await self._runtime.fail(
                     db,
                     workflow,
-                    WorkflowState.failed,
-                    "failed",
-                    "Analysis failed",
-                    {"error": str(exc)},
+                    substate="failed",
+                    message="Analysis failed",
+                    error_code="analysis_failed",
+                    payload={"error": str(exc)},
                 )
 
     async def _run_deep_research(
@@ -305,16 +319,16 @@ class WorkflowOrchestrator:
 
     async def _seed_report_from_latest(self, db: AsyncSession, symbol: str) -> dict[str, Any] | None:
         latest_result = await db.execute(
-            select(AnalysisWorkflow)
+            select(AnalysisSymbolSnapshot)
             .where(
-                AnalysisWorkflow.symbol == symbol,
-                AnalysisWorkflow.state.in_(["completed", "completed_cached"]),
+                AnalysisSymbolSnapshot.symbol == symbol,
+                AnalysisSymbolSnapshot.state.in_(["completed", "completed_cached"]),
             )
-            .order_by(desc(AnalysisWorkflow.updated_at))
+            .order_by(desc(AnalysisSymbolSnapshot.updated_at))
             .limit(1)
         )
         latest = latest_result.scalar_one_or_none()
-        payload = latest.result_payload if latest is not None else None
+        payload = latest.details if latest is not None and isinstance(latest.details, dict) else None
         if not isinstance(payload, dict):
             return None
         report_markdown = payload.get("reportMarkdown")
@@ -332,6 +346,38 @@ class WorkflowOrchestrator:
             else {},
         }
         return seeded
+
+    async def _hydrate_cached_result(
+        self,
+        *,
+        db: AsyncSession,
+        workflow: AnalysisWorkflow,
+        context: WorkflowContext,
+    ) -> None:
+        if workflow.force_refresh:
+            return
+        result = await db.execute(
+            select(AnalysisSymbolSnapshot).where(
+                AnalysisSymbolSnapshot.symbol == workflow.symbol,
+                AnalysisSymbolSnapshot.state.in_(["completed", "completed_cached"]),
+            )
+        )
+        snapshot = result.scalar_one_or_none()
+        if snapshot is None:
+            return
+        if snapshot.freshness_expires_at and snapshot.freshness_expires_at < datetime.now(timezone.utc):
+            return
+        details = snapshot.details if isinstance(snapshot.details, dict) else {}
+        summary = snapshot.summary if isinstance(snapshot.summary, dict) else {}
+        context["cached_result"] = {
+            "id": workflow.id,
+            "symbol": workflow.symbol,
+            "summary": summary,
+            "details": details,
+            "modelMetadata": snapshot.model_metadata if isinstance(snapshot.model_metadata, dict) else {},
+            "reportMarkdown": details.get("reportMarkdown"),
+            "citations": details.get("citations", []),
+        }
 
 
 __all__ = ["WorkflowOrchestrator"]

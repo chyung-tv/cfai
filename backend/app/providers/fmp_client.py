@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 from dataclasses import dataclass
+import json
 from typing import Any
 from urllib.parse import urlsplit
 
@@ -34,6 +35,9 @@ class FmpClient:
         parts = urlsplit(self._base_url)
         self._base_origin = f"{parts.scheme}://{parts.netloc}" if parts.scheme and parts.netloc else self._base_url
         self._timeout_seconds = timeout_seconds
+        self._max_retries = 3
+        self._base_backoff_seconds = 0.5
+        self._client: httpx.AsyncClient | None = None
 
     async def fetch_stock_directory(self) -> FmpCallResult:
         return await self._request_with_fallback(
@@ -201,6 +205,8 @@ class FmpClient:
                 return FmpCallResult(data=data, endpoint=endpoint)
             except FmpClientError as exc:
                 errors.append(f"{endpoint}:{exc.code}")
+                if exc.code in {"missing_api_key", "unauthorized"}:
+                    raise
                 continue
 
         joined = ", ".join(errors) if errors else "unknown_error"
@@ -209,32 +215,48 @@ class FmpClient:
     async def _request_json(self, *, endpoint: str, params: dict[str, Any]) -> list[dict[str, Any]]:
         full_params = {**params, "apikey": self._api_key}
         url = self._build_url(endpoint)
-
-        try:
-            async with httpx.AsyncClient(timeout=self._timeout_seconds) as client:
-                response = await client.get(url, params=full_params)
-        except httpx.TimeoutException as exc:
-            raise FmpClientError("timeout", f"request timed out for {endpoint}") from exc
-        except httpx.HTTPError as exc:
-            raise FmpClientError("http_error", f"http client error for {endpoint}") from exc
-
-        if response.status_code == 401:
-            raise FmpClientError("unauthorized", "FMP API key is unauthorized")
-        if response.status_code == 402:
-            raise FmpClientError("plan_restricted", "FMP plan does not include this endpoint")
-        if response.status_code == 429:
-            raise FmpClientError("rate_limited", "FMP rate limit exceeded")
-        if response.status_code >= 400:
-            raise FmpClientError("upstream_error", f"upstream status {response.status_code}")
-
-        payload = response.json()
-        if isinstance(payload, list):
-            return [row for row in payload if isinstance(row, dict)]
-        if isinstance(payload, dict):
-            maybe_rows = payload.get("data")
-            if isinstance(maybe_rows, list):
-                return [row for row in maybe_rows if isinstance(row, dict)]
-        raise FmpClientError("schema_error", f"unexpected payload shape from {endpoint}")
+        for attempt in range(1, self._max_retries + 1):
+            try:
+                response = await self._get_client().get(url, params=full_params)
+                if response.status_code == 401:
+                    raise FmpClientError("unauthorized", "FMP API key is unauthorized")
+                if response.status_code == 402:
+                    raise FmpClientError("plan_restricted", "FMP plan does not include this endpoint")
+                if response.status_code == 429:
+                    wait = self._retry_after_seconds(response) or self._backoff_seconds(attempt)
+                    if attempt < self._max_retries:
+                        await asyncio.sleep(wait)
+                        continue
+                    raise FmpClientError("rate_limited", "FMP rate limit exceeded")
+                if response.status_code >= 500:
+                    if attempt < self._max_retries:
+                        await asyncio.sleep(self._backoff_seconds(attempt))
+                        continue
+                    raise FmpClientError("upstream_error", f"upstream status {response.status_code}")
+                if response.status_code >= 400:
+                    raise FmpClientError("upstream_error", f"upstream status {response.status_code}")
+                try:
+                    payload = response.json()
+                except json.JSONDecodeError as exc:
+                    raise FmpClientError("decode_error", f"non-json response from {endpoint}") from exc
+                if isinstance(payload, list):
+                    return [row for row in payload if isinstance(row, dict)]
+                if isinstance(payload, dict):
+                    maybe_rows = payload.get("data")
+                    if isinstance(maybe_rows, list):
+                        return [row for row in maybe_rows if isinstance(row, dict)]
+                raise FmpClientError("schema_error", f"unexpected payload shape from {endpoint}")
+            except httpx.TimeoutException as exc:
+                if attempt < self._max_retries:
+                    await asyncio.sleep(self._backoff_seconds(attempt))
+                    continue
+                raise FmpClientError("timeout", f"request timed out for {endpoint}") from exc
+            except httpx.HTTPError as exc:
+                if attempt < self._max_retries:
+                    await asyncio.sleep(self._backoff_seconds(attempt))
+                    continue
+                raise FmpClientError("http_error", f"http client error for {endpoint}") from exc
+        raise FmpClientError("upstream_error", f"unreachable request failure for {endpoint}")
 
     def _build_url(self, endpoint: str) -> str:
         raw_endpoint = endpoint.strip()
@@ -255,6 +277,28 @@ class FmpClient:
             return f"{self._base_origin}{normalized_endpoint}"
 
         return f"{base}{normalized_endpoint}"
+
+    def _get_client(self) -> httpx.AsyncClient:
+        if self._client is None:
+            self._client = httpx.AsyncClient(
+                timeout=self._timeout_seconds,
+                limits=httpx.Limits(max_keepalive_connections=20, max_connections=100),
+            )
+        return self._client
+
+    def _backoff_seconds(self, attempt: int) -> float:
+        return self._base_backoff_seconds * (2 ** max(0, attempt - 1))
+
+    @staticmethod
+    def _retry_after_seconds(response: httpx.Response) -> float | None:
+        value = response.headers.get("Retry-After")
+        if value is None:
+            return None
+        try:
+            parsed = float(value)
+        except ValueError:
+            return None
+        return parsed if parsed > 0 else None
 
     @staticmethod
     def _normalize_sdk_rows(payload: Any, *, sdk_method: str) -> list[dict[str, Any]]:

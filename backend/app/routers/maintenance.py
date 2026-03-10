@@ -36,6 +36,9 @@ def create_maintenance_router(seed_service: CatalogSeedService) -> APIRouter:
             "profileCoverage": run.profile_coverage,
             "errorCode": run.error_code,
             "errorMessage": run.error_message,
+            "workerId": run.worker_id,
+            "heartbeatAt": run.heartbeat_at.isoformat() if run.heartbeat_at else None,
+            "attemptCount": run.attempt_count,
             "startedAt": run.started_at.isoformat(),
             "finishedAt": run.finished_at.isoformat() if run.finished_at else None,
             "createdAt": run.created_at.isoformat(),
@@ -57,6 +60,8 @@ def create_maintenance_router(seed_service: CatalogSeedService) -> APIRouter:
                     "updatedCount": run.updated_count,
                     "profileCoverage": run.profile_coverage,
                     "errorCode": run.error_code,
+                    "workerId": run.worker_id,
+                    "heartbeatAt": run.heartbeat_at.isoformat() if run.heartbeat_at else None,
                     "startedAt": run.started_at.isoformat(),
                     "finishedAt": run.finished_at.isoformat() if run.finished_at else None,
                 }

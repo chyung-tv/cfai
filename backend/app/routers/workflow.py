@@ -12,11 +12,10 @@ from sqlalchemy import desc, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.session import get_db
+from app.models.workflow.analysis_candidate_card import AnalysisCandidateCard
 from app.models.workflow.analysis_workflow import AnalysisWorkflow
 from app.models.workflow.analysis_workflow_event import AnalysisWorkflowEvent
-from app.models.workflow.analysis_workflow_projection import AnalysisWorkflowProjection
-from app.workflows.analysis.projections.normalizer import normalize_projection_payload
-from app.workflows.analysis.projections.store import upsert_workflow_projection
+from app.models.workflow.analysis_symbol_snapshot import AnalysisSymbolSnapshot
 from app.workflows.analysis.orchestrator import WorkflowOrchestrator
 from app.workflows.analysis.sse import SseBroker
 
@@ -81,9 +80,11 @@ def create_workflow_router(
         return {
             "events": [
                 {
-                    "id": event.workflow_id,
+                    "id": event.id,
+                    "seqNo": event.seq_no,
                     "state": event.state,
                     "substate": event.substate,
+                    "eventType": event.event_type,
                     "message": event.message,
                     "payload": event.payload,
                     "createdAt": event.created_at.isoformat(),
@@ -109,24 +110,26 @@ def create_workflow_router(
     ) -> dict[str, Any] | None:
         symbol = symbol.strip().upper()
         result = await db.execute(
-            select(AnalysisWorkflowProjection)
+            select(AnalysisSymbolSnapshot)
             .where(
-                AnalysisWorkflowProjection.symbol == symbol,
-                AnalysisWorkflowProjection.state.in_(["completed", "completed_cached"]),
+                AnalysisSymbolSnapshot.symbol == symbol,
+                AnalysisSymbolSnapshot.state.in_(["completed", "completed_cached"]),
             )
-            .order_by(desc(AnalysisWorkflowProjection.updated_at))
+            .order_by(desc(AnalysisSymbolSnapshot.updated_at))
             .limit(1)
         )
-        projection = result.scalar_one_or_none()
-        if projection is not None:
-            if isinstance(projection.result_payload, dict):
-                payload = projection.result_payload
-                if not isinstance(payload.get("summary"), dict):
-                    payload, _ = normalize_projection_payload(base_payload=payload)
-                return _with_freshness(payload, projection.updated_at)
+        snapshot = result.scalar_one_or_none()
+        if snapshot is not None:
+            if isinstance(snapshot.summary, dict) and isinstance(snapshot.details, dict):
+                payload = {
+                    "summary": snapshot.summary,
+                    "details": snapshot.details,
+                    "modelMetadata": snapshot.model_metadata if isinstance(snapshot.model_metadata, dict) else {},
+                }
+                return _with_freshness(payload, snapshot.updated_at)
             return None
 
-        # Backward-compatible fallback for rows created before projection table rollout.
+        # Backward-compatible fallback for older rows during transition.
         fallback = await db.execute(
             select(AnalysisWorkflow)
             .where(
@@ -139,10 +142,42 @@ def create_workflow_router(
         workflow = fallback.scalar_one_or_none()
         if workflow is None:
             return None
-        if not isinstance(workflow.result_payload, dict):
-            return None
-        fallback_payload, _ = normalize_projection_payload(base_payload=workflow.result_payload)
-        return _with_freshness(fallback_payload, workflow.updated_at)
+        # No legacy payload available after schema redesign.
+        return None
+
+    @router.get("/candidates")
+    async def get_candidate_cards(
+        limit: int = Query(default=100, ge=1, le=500),
+        db: AsyncSession = Depends(get_db),
+    ) -> dict[str, Any]:
+        result = await db.execute(
+            select(AnalysisCandidateCard)
+            .order_by(
+                desc(AnalysisCandidateCard.quality_score),
+                desc(AnalysisCandidateCard.freshness_updated_at),
+            )
+            .limit(limit)
+        )
+        rows = result.scalars().all()
+        return {
+            "cards": [
+                {
+                    "symbol": row.symbol,
+                    "qualityScore": row.quality_score,
+                    "valuationSignal": row.valuation_signal,
+                    "recentChangeSignal": row.recent_change_signal,
+                    "portfolioImpactSignal": row.portfolio_impact_signal,
+                    "freshnessUpdatedAt": row.freshness_updated_at.isoformat()
+                    if row.freshness_updated_at
+                    else None,
+                    "freshnessExpiresAt": row.freshness_expires_at.isoformat()
+                    if row.freshness_expires_at
+                    else None,
+                    "payload": row.card_payload,
+                }
+                for row in rows
+            ]
+        }
 
     @router.get("/history")
     async def get_analysis_history(db: AsyncSession = Depends(get_db)) -> list[dict[str, Any]]:
@@ -157,7 +192,7 @@ def create_workflow_router(
                 "status": item.state,
                 "traceId": item.id,
                 "createdAt": item.created_at.isoformat(),
-                "analysisResult": item.result_payload,
+                "analysisResult": None,
             }
             for item in workflows
         ]
@@ -178,23 +213,9 @@ def create_workflow_router(
         query_id: str,
         db: AsyncSession = Depends(get_db),
     ) -> dict[str, str]:
-        result = await db.execute(select(AnalysisWorkflow).where(AnalysisWorkflow.id == query_id))
-        workflow = result.scalar_one_or_none()
-        if workflow is None:
+        ok = await orchestrator.mark_workflow_failed(db=db, workflow_id=query_id)
+        if not ok:
             raise HTTPException(status_code=404, detail="query not found")
-        workflow.state = "failed"
-        workflow.substate = "failed"
-        db.add(
-            AnalysisWorkflowEvent(
-                workflow_id=workflow.id,
-                state="failed",
-                substate="failed",
-                message="Marked failed manually",
-                payload=None,
-            )
-        )
-        await upsert_workflow_projection(db, workflow, message="Marked failed manually")
-        await db.commit()
         return {"status": "failed"}
 
     return router

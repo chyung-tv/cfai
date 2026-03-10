@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass
+from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 
 def _as_int(name: str, default: int) -> int:
@@ -21,11 +22,28 @@ def _as_bool(name: str, default: bool) -> bool:
     return raw.strip().lower() in {"1", "true", "yes", "on"}
 
 
+def _normalize_database_url(raw: str) -> str:
+    value = (raw or "").strip()
+    if not value:
+        return ""
+    if value.startswith("postgresql://"):
+        value = "postgresql+asyncpg://" + value[len("postgresql://") :]
+
+    parts = urlsplit(value)
+    query_items = dict(parse_qsl(parts.query, keep_blank_values=True))
+    sslmode = query_items.pop("sslmode", None)
+    query_items.pop("channel_binding", None)
+    if sslmode and "ssl" not in query_items:
+        query_items["ssl"] = "require" if sslmode.lower() in {"require", "verify-full"} else sslmode
+    normalized_query = urlencode(query_items)
+    return urlunsplit((parts.scheme, parts.netloc, parts.path, normalized_query, parts.fragment))
+
+
 @dataclass(frozen=True)
 class Settings:
     app_env: str = os.getenv("APP_ENV", "development")
-    database_url: str = os.getenv("DATABASE_URL", "")
-    database_url_direct: str = os.getenv("DATABASE_URL_DIRECT", "")
+    database_url: str = _normalize_database_url(os.getenv("DATABASE_URL", ""))
+    database_url_direct: str = _normalize_database_url(os.getenv("DATABASE_URL_DIRECT", ""))
     frontend_url: str = os.getenv("FRONTEND_URL", "http://localhost:3000")
     google_oauth_client_id: str = os.getenv("GOOGLE_OAUTH_CLIENT_ID", "")
     google_oauth_client_secret: str = os.getenv("GOOGLE_OAUTH_CLIENT_SECRET", "")
