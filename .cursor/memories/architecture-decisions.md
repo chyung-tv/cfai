@@ -1,6 +1,6 @@
 # CFAI Architecture Decisions
 
-Last validated: 2026-03-09 (local-dev policy bypass + runtime stability notes)
+Last validated: 2026-03-10 (portfolio-first product hierarchy decisions)
 Purpose: compact ADR index with only active decision signal.
 
 ## Status Keys
@@ -60,7 +60,7 @@ Purpose: compact ADR index with only active decision signal.
 
 ### ADR-0009 - Local-first product milestone prioritizes research hub over policy hardening
 - Date: 2026-03-09
-- Status: `accepted`
+- Status: `superseded`
 - Why: current local objective is solving stock analysis workflow usability and decision-support flow first.
 - Impact: implement summary/drill-down/compare blueprint before auth/rbac/quota hardening.
 
@@ -94,10 +94,47 @@ Purpose: compact ADR index with only active decision signal.
   - Remove admin role guards on maintenance seed routes in local dev flow.
   - Reintroduce auth/rbac/quota guards as a follow-up hardening slice after core milestone completion.
 
+### ADR-0014 - Portfolio builder is v1 primary product surface
+- Date: 2026-03-10
+- Status: `accepted`
+- Why: user intent is portfolio construction and portfolio health monitoring; workflow visibility alone is not the product outcome.
+- Impact:
+  - portfolio-home becomes north-star UX
+  - analysis workflow is positioned as supporting intelligence engine
+  - implementation sequencing prioritizes portfolio modules over analysis-lab expansion
+
+### ADR-0015 - Analysis UI is internal observation lab, not primary journey
+- Date: 2026-03-10
+- Status: `accepted`
+- Why: the current analysis-heavy UI is useful for debugging engine behavior but should not define main user journey.
+- Impact:
+  - keep analysis UI for internal troubleshooting and parity checks
+  - enforce clear product/tool boundary in roadmap and UI labeling
+
+### ADR-0016 - v1 interaction policy: lightweight default, deep explicit, cache-first with freshness badge
+- Date: 2026-03-10
+- Status: `accepted`
+- Why: balance speed, cost, and user control while preserving transparency.
+- Impact:
+  - symbols default to lightweight analysis mode
+  - deep analysis runs only when explicitly requested by user action
+  - cached projection is shown immediately with `last updated` freshness badge
+
+### ADR-0017 - v1 portfolio state persistence is local browser storage
+- Date: 2026-03-10
+- Status: `accepted`
+- Why: unblock rapid UX iteration without introducing account/data model complexity in this milestone.
+- Impact:
+  - persist one working portfolio locally in browser storage
+  - defer account-backed multi-portfolio persistence to later phase
+
 ## Open Decision Candidates
 
 - Auth/rbac/quota reintroduction plan and sequencing after core milestone completion.
 - Quota model details (limits, reset cadence, role overrides, error semantics).
+- Default add weight for portfolio builder (`5%` proposed).
+- v1 formula contract for portfolio risk score and expected return range.
+- Candidate feed default ranking policy.
 
 ## References
 

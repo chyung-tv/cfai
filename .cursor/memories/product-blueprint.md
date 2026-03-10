@@ -1,24 +1,26 @@
 # CFAI Product Blueprint (Canonical)
 
-Last validated: 2026-03-09  
+Last validated: 2026-03-10  
 Purpose: single canonical reference for product intent, UX shape, staged delivery, and acceptance.
 
 ## 1) Problem We Are Solving
 
-Turn one-click stock analysis into a decision-support research hub:
-- run or reuse analysis for a symbol
-- show a clear top-level summary first
-- allow drill-down into deep reasoning and raw detail
-- support lightweight cross-symbol comparison as a stepping stone to future screening
+Make portfolio construction the primary user experience:
+- quickly assemble a portfolio from candidate stocks
+- immediately understand portfolio risk/return/concentration signals
+- use stock analysis as supporting evidence material, not the main product destination
 
 ## 2) Product Intent (Agreed)
 
-- Primary mode: structured research hub (not auto-trading recommendation engine).
+- Primary mode: portfolio builder dashboard (`portfolio-home`) as v1 north-star screen.
+- Analysis workflow is an intelligence engine feeding portfolio decisions.
+- Existing analysis page remains an internal observation lab for debugging/inspection.
 - v1 output style: evidence-first; no explicit final buy/hold/avoid verdict.
-- Summary priority: business quality first, then valuation legitimacy, then thesis.
-- Trigger behavior: staleness-window policy (reuse fresh result, refresh stale result).
-- Compare mode: ranked sortable table for analyzed symbols.
-- Default compare rank: quality first, then valuation legitimacy.
+- Data freshness policy: show cached data fast with `last updated` badge and predictable refresh behavior.
+- Analysis modes:
+  - default `lightweight` mode
+  - explicit user action required for `deep` mode
+- v1 persistence: local browser save only (no account-level portfolio persistence yet).
 
 ## Canonicality Rule
 
@@ -29,100 +31,172 @@ Turn one-click stock analysis into a decision-support research hub:
 
 ## 3) Core UX Shape
 
-### Single-Stock Research Hub
-- Symbol input with one-click analysis request.
-- Top summary blocks (must-have):
-  - investment thesis
-  - business quality
-  - valuation legitimacy
-- Drill-down tabs:
-  - deep research narrative/citations
-  - quant details (`reverse_dcf`, growth audit)
-  - detailed payload inspector
-- Live run visibility:
-  - status/substate and timeline during execution
+### Portfolio Home (Primary)
+- Start empty by default.
+- Left panel (`Portfolio Builder`):
+  - drag/drop or add stock
+  - assign default starting weight on add
+  - edit/remove positions
+- Portfolio summary (always visible):
+  - overall risk score
+  - expected return range
+  - sector concentration warning
 
-### Compare View (Lightweight)
-- Table over analyzed symbols only.
-- Sortable columns (v1):
-  - symbol
-  - business quality tier
-  - valuation legitimacy
-  - risk proxy count
-  - last updated
-- Row click opens symbol research hub detail.
+### Candidate Feed (Integrated, Right Panel)
+- Candidate card list starts from seeded stock set (~50 from DB) and can accept search inserts.
+- Each card shows mixed snapshot:
+  - business quality cue
+  - valuation cue
+  - recent change cue
+  - portfolio impact cue
+- Each card shows freshness badge (`last updated`).
+- Card actions:
+  - drag/add to portfolio
+  - open `more` detail
 
-## 4) Implementation Stages
+### Stock Detail (From `more`)
+- Keep existing depth but reorganize for readability:
+  - summary first
+  - evidence and quant details second
+  - raw/deep internals last
+- Surface analysis mode state and explicit upgrade path:
+  - current mode label (`lightweight`/`deep`)
+  - `Run Deep Analysis` action
 
-### Stage 0 - Contract Freeze
-Goal: lock a stable summary contract from existing projection payload.
-- Define `SummaryViewModel` fields:
-  - `investmentThesis`
-  - `businessQuality`
-  - `valuationLegitimacy`
-  - `analysisFreshness`
-- Keep `contract_version` discipline in projection normalizer.
-- Dev/test LLM runtime policy for full workflow cost control:
-  - deep-research node stays in workflow but defaults to `gemini-3.1-flash-lite-preview`
-  - dev deep-research flash-lite path enables grounding by default (`DEEP_RESEARCH_DEV_GROUNDING_ENABLED=true`)
-  - production may route deep-research node to deep-research endpoint while non-deep-research nodes remain flash-lite
-- Canonical backend mapping:
+### Analysis Observation Lab (Internal Tool)
+- Keep `/demo/analysis` as non-primary, internal-facing workflow observability UI.
+- Use for pipeline debugging, payload inspection, and execution timeline verification.
+
+## 4) Module Function Contracts (v1)
+
+### Module A - Portfolio Builder Module
+- Input: selected symbols + optional weights.
+- Output: ordered positions with editable weights.
+- Responsibilities:
+  - default weight assignment on add
+  - weight edit/remove interactions
+  - local-save hydration and persistence
+
+### Module B - Portfolio Metrics Module
+- Input: current portfolio positions + latest per-symbol projections.
+- Output:
+  - `portfolioRiskScore`
+  - `expectedReturnRange`
+  - `sectorConcentrationWarning`
+- Responsibilities:
+  - recompute on portfolio change
+  - provide freshness/confidence hint
+
+### Module C - Candidate Feed Module
+- Input: seeded symbol universe + projection snapshots.
+- Output: sortable/filterable card list for portfolio actions.
+- Responsibilities:
+  - cache-first card render
+  - freshness badge render
+  - drag/add and `more` entry points
+
+### Module D - Stock Detail Module
+- Input: selected symbol + latest projection/artifacts.
+- Output: organized detail sections with mode action control.
+- Responsibilities:
+  - readable information hierarchy
+  - explicit `Run Deep Analysis` escalation
+  - non-blocking refresh state display
+
+### Module E - Analysis Mode Controller
+- Input: symbol + user mode selection.
+- Output: workflow trigger policy selection.
+- Responsibilities:
+  - lightweight default path
+  - deep explicit path
+  - mode status communication in UI
+
+### Module F - Freshness and Cache Policy Module
+- Input: latest projection metadata (`updated_at`, freshness window).
+- Output: cache/fresh/stale state for UI + trigger policy.
+- Responsibilities:
+  - return cached state immediately
+  - label `last updated`
+  - refresh stale data without blanking current view
+
+## 5) Implementation Stages (Detailed)
+
+### Stage P0 - Product Reframe and Contract Alignment
+Goal: make portfolio-home the canonical primary UX and demote analysis page to internal lab.
+- Update docs and contracts to reflect product hierarchy.
+- Define/lock `PortfolioSummaryViewModel` fields:
+  - `portfolioRiskScore`
+  - `expectedReturnRange`
+  - `sectorConcentrationWarning`
+  - `metricsFreshness`
+- Confirm lightweight/deep mode semantics in API surface and UI copy.
+- Canonical mapping:
+  - `frontend/src/app/demo/analysis/page.tsx` (internal-role clarity)
+  - `backend/app/routers/workflow.py`
   - `backend/app/workflows/analysis/projections/normalizer.py`
-  - `backend/app/models/workflow/analysis_workflow_projection.py`
-  - `backend/app/routers/workflow.py`
 
-### Stage 1 - Research Hub Summary + Drill-Down
-Goal: deliver the quality-first single-stock page experience.
-- Render summary cards in priority order.
-- Keep detail tabs and timeline visible.
-- Handle incomplete payloads gracefully.
-- Canonical frontend mapping:
-  - `frontend/src/app/demo/analysis/page.tsx`
-
-### Stage 2 - Staleness-Window Flow
-Goal: improve one-click behavior and latency perception.
-- Fetch latest projection.
-- If fresh: return/show immediately.
-- If stale: trigger refresh and stream progress; keep old summary visible until replaced.
+### Stage P1 - Portfolio Home Skeleton
+Goal: deliver visible portfolio-first layout and interactions.
+- Implement left/right two-panel UX with drag/add path.
+- Add default-weight behavior on stock add.
+- Add local-save restore path for working portfolio.
+- Keep stock cards cache-first with freshness badge.
 - Canonical mapping:
-  - `backend/app/routers/workflow.py`
-  - `backend/app/workflows/analysis/orchestrator.py`
-  - `frontend/src/app/demo/analysis/page.tsx`
+  - `frontend/src/app/demo/analysis/page.tsx` (until dedicated route split)
+  - `frontend/src/components/*` (moduleized UI extraction)
 
-### Stage 3 - Lightweight Compare
-Goal: enable practical multi-symbol inspection before full screening.
-- Add compare API over projection rows.
-- Add sortable table UI with default ranking.
-- Support quick drill-in to symbol detail page.
+### Stage P2 - Portfolio Metrics and Candidate Feed
+Goal: make portfolio decisions actionable in under two minutes.
+- Compute and render three mandatory metrics.
+- Add candidate feed ranking/filter behavior suitable for quick add.
+- Ensure metrics recompute on weight/position edits.
 - Canonical mapping:
-  - `backend/app/routers/workflow.py`
   - `backend/app/workflows/analysis/projections/store.py`
+  - `backend/app/routers/workflow.py`
   - `frontend/src/app/demo/analysis/page.tsx`
 
-### Stage 4 - Screening Foundations
-Goal: prepare data model for future screening scale.
-- Persist normalized compare keys in projection model.
-- Ensure stable ordering semantics and retention baseline.
-- Document transition to full screener module.
+### Stage P3 - Detail Reorganization + Deep Escalation
+Goal: keep rich detail while improving readability and explicit depth control.
+- Reorganize `more` detail into summary/evidence/deep sections.
+- Add explicit deep-mode action with clear progress state.
+- Keep stale data visible while refresh/deep runs in background.
 - Canonical mapping:
-  - `backend/app/workflows/analysis/projections/normalizer.py`
-  - `backend/app/models/workflow/analysis_workflow_projection.py`
+  - `frontend/src/app/demo/analysis/page.tsx`
+  - `backend/app/workflows/analysis/orchestrator.py`
+  - `backend/app/routers/workflow.py`
 
-## 5) Acceptance Criteria by Stage
+### Stage P4 - Internal Observation Lab Hard Boundary
+Goal: ensure internal tooling does not define product UX direction.
+- Keep advanced workflow internals in lab-only context.
+- Add clear labeling/route intent for internal-only usage.
+- Maintain parity checks so lab can validate engine behavior.
+- Canonical mapping:
+  - `frontend/src/app/demo/analysis/page.tsx`
+  - internal docs and runbooks
 
-- Stage 0: summary contract is explicit, versioned, and backward-safe.
-- Stage 1: one stock can be analyzed and understood from summary without reading raw payload.
-- Stage 2: stale/fresh behavior is predictable and visible in UI state.
-- Stage 3: user can compare multiple analyzed symbols and open details quickly.
-- Stage 4: compare model supports future screening without contract rewrite.
+## 6) Acceptance Criteria by Stage
 
-## 6) Deferred (Explicitly Not in This Milestone)
+- P0: product docs and contracts unambiguously define portfolio as primary UX.
+- P1: user can add/edit portfolio positions and recover local state after refresh.
+- P2: user sees risk/return/concentration updates from current portfolio edits.
+- P3: user can inspect organized stock detail and explicitly trigger deep analysis.
+- P4: analysis lab is clearly internal and no longer treated as primary product flow.
+
+## 7) Deferred (Explicitly Not in This Milestone)
 
 - Auth/rbac/quota hardening for production.
-- Explicit portfolio optimizer/recommendation engine.
-- Full-market screener UX and broad universe ranking.
+- Full account-backed portfolio persistence and sharing.
+- Fully automated optimizer/rebalancer recommendations.
+- Full-market screener UX and broad-universe ranking.
 
-## 7) Canonical Files for Execution
+## 8) Open Decisions (Explicit Defaults)
+
+- Default weight on add: unresolved (`5%` proposed default).
+- Portfolio risk/return formulas: heuristic v1 vs model-backed v1.1.
+- Candidate feed default sort: quality-first vs portfolio-impact-first.
+- Seed refresh policy for initial ~50 symbols: manual reseed vs scheduled refresh.
+
+## 9) Canonical Files for Execution
 
 - Roadmap and execution status: `./roadmap.md`
 - Architecture target state: `./architecture.md`

@@ -1,6 +1,6 @@
 # CFAI Architecture Snapshot
 
-Last validated: 2026-03-09 (product specs delegated to blueprint)
+Last validated: 2026-03-10 (portfolio-first product hierarchy alignment)
 Purpose: concise target-state + current-state architecture for Phase 1.
 
 ## 1) System Shape
@@ -8,6 +8,10 @@ Purpose: concise target-state + current-state architecture for Phase 1.
 - `frontend` (Next.js App Router, shadcn/ui, Tailwind) consumes backend APIs only.
 - `backend` (FastAPI) owns orchestration, auth/policy boundary, and provider integration.
 - `postgres` is source of truth for auth, workflow state/events/artifacts, projections, and catalog.
+- Product interaction hierarchy:
+  - primary user surface: portfolio-home UX
+  - supporting engine: analysis workflow/projections
+  - internal tool: analysis observation lab
 
 ## 2) Workflow Domains
 
@@ -19,9 +23,12 @@ Purpose: concise target-state + current-state architecture for Phase 1.
 - Current shape: top-500 US seed workflow with run tracking and admin APIs.
 
 ### Analysis (implemented core)
-- Purpose: async user-driven stock analysis pipeline.
+- Purpose: async stock intelligence pipeline supporting portfolio decisions.
 - Node chain: `resolve_query` -> `deep_research` -> `structured_output` -> `reverse_dcf` -> `audit_growth_likelihood` -> `advisor_decision` -> persistence + SSE.
 - Contract: trigger returns processing + trace ID; progress is SSE + persisted events.
+- Mode policy:
+  - default: lightweight path
+  - deep path: explicit user escalation action
 
 ## 3) Data and Read Model
 
@@ -34,6 +41,10 @@ Purpose: concise target-state + current-state architecture for Phase 1.
   - versioned normalization boundary via `contract_version`
 - Current API read path:
   - `/analysis/latest` reads projection first, then fallback to workflow row.
+- Portfolio-facing read needs:
+  - candidate card snapshots with freshness metadata
+  - per-symbol fields consumable by portfolio metrics computation
+  - cache-first response semantics
 
 ## 4) Auth/RBAC/Quota Boundary
 
@@ -49,6 +60,9 @@ Purpose: concise target-state + current-state architecture for Phase 1.
 - Catalog data path is adapter-based and provider-constrained.
 - Deep research is model-provider based; v1 persisted payload remains markdown-first with embedded citations.
 - Heavy node outputs are stored as artifacts/projections, not threaded as large in-memory context.
+- Operational policy for product UX:
+  - default symbol analysis uses lightweight mode for responsiveness/cost control
+  - deep endpoint/model path is secondary and explicit
 
 ## 6) Deferred / Open
 
@@ -56,6 +70,7 @@ Purpose: concise target-state + current-state architecture for Phase 1.
 - Finalized auth policy for analysis read/event endpoints (deferred in local-first milestone).
 - Reprojection tooling + stronger projection contract hardening.
 - Seed universe expansion beyond current top-500 proxy set.
+- Account-backed portfolio persistence and multi-portfolio management.
 
 ## 7) Product Experience Reference
 

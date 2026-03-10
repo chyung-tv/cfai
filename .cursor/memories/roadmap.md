@@ -1,6 +1,6 @@
 # CFAI Roadmap
 
-Last validated: 2026-03-09 (Stage 1 shipped + local-dev hardening and runtime fixes)
+Last validated: 2026-03-10 (portfolio-first reframe accepted; execution queue resequenced)
 Purpose: single source of execution status and next actions.
 
 ## Session Briefing (mandatory order)
@@ -9,58 +9,139 @@ Purpose: single source of execution status and next actions.
 2. What we need to implement next
 3. What we just implemented
 
-- Where we are at: Modules 1-2 are complete; Stage 0 and Stage 1 are implemented with summary-first `/analysis/latest` UX active and usable in `/demo/analysis`.
-- What we need to implement next: execute Stage 2 staleness-window flow (show latest immediately, refresh stale in background with visible progression).
-- What we just implemented: local-dev hardening after Stage 1 (auth guard temporary bypass for core milestone, CORS alignment for localhost/0.0.0.0 origins, advisor schema strictness relaxation, and workflow failure persistence fix).
+- Where we are at: core analysis engine is operational, but product direction is now portfolio-home first; analysis UI is treated as internal observation lab.
+- What we need to implement next: execute Stage P1 (portfolio home skeleton with add/edit positions, local save, candidate feed, freshness badges).
+- What we just implemented: canonical product blueprint redefined to portfolio-primary with lightweight-default/deep-explicit analysis policy.
 
 ## Module Status
 
-- [x] Module 1 - Hard cutover and pruning
-- [x] Module 2 - Containerized runtime foundation
-- [~] Module 3 - Backend core (workflow + auth/rbac/quota) *(active)*
-- [~] Module 4 - Frontend adaptation *(active)*
-- [ ] Module 5 - Phase 1 completion gate
+- [x] Module 1 - Runtime foundation and workflow plumbing
+- [x] Module 2 - Projection-backed analysis read path
+- [~] Module 3 - Portfolio-first UX reframe (docs/contracts) *(active)*
+- [ ] Module 4 - Portfolio home implementation (P1/P2)
+- [ ] Module 5 - Detail reorg + deep escalation flow (P3)
+- [ ] Module 6 - Internal observation lab boundary + milestone gate (P4)
 
-## Reality Check (2026-03-09)
+## Reality Check (2026-03-10)
 
 - Backend analysis workflow exists end-to-end: `resolve_query` -> `deep_research` -> `structured_output` -> `reverse_dcf` -> `audit_growth_likelihood` -> `advisor_decision`.
-- Projection read model exists and `/analysis/latest` reads from `analysis_workflow_projections` with fallback.
-- Maintenance seed domain exists with admin endpoints and run tracking.
-- Frontend `/demo/analysis` exists with tabs-first IA and SSE timeline.
-- Quota guard is not implemented in backend yet (explicitly deferred in local-first milestone).
-- Auth/rbac guards are intentionally disabled across analysis and maintenance routes for local core milestone velocity; restore policy gates after core milestone completion.
-- Analysis failure persistence no longer crashes on oversized error strings (`error_message` now safely truncated to DB column length).
-- `/demo/analysis` usability polish applied (font token fix, compact pipeline chips, improved spacing/tab behavior).
+- Projection read model exists; `/analysis/latest` is projection-first with fallback.
+- Existing frontend page (`/demo/analysis`) contains workflow observability and rich detail content.
+- Product priority changed: portfolio builder is the intended user product, not workflow observability.
+- Quota guard is still deferred; auth/rbac are intentionally relaxed in local milestone flow.
 
 ## Current Focus
 
-- Active slice: Product experience milestone (research hub + compare table).
+- Active slice: Stage P1 portfolio-home skeleton and module boundaries.
 - Owners: user + coding agent.
 - Blockers: see `./debuglog.md`.
 
-## Next Execution Queue
+## Detailed Implementation Queue
 
-1. Execute Stage 2 from `./product-blueprint.md`:
-   - implement staleness-window UX (show latest immediately, refresh stale in background)
-2. Execute Stage 3 from `./product-blueprint.md`:
-   - projection-backed compare endpoint + sortable table
-3. Execute Stage 4 from `./product-blueprint.md`:
-   - normalized compare keys and retention baseline
-4. Run local acceptance checks per stage and record outcomes here.
+### Stage P0 - Product Reframe and Contract Alignment (Done)
+Status: `completed`
+- Update canonical product hierarchy in `product-blueprint.md`.
+- Lock policy: lightweight default + explicit deep.
+- Lock persistence policy: local save only for v1.
+
+### Stage P1 - Portfolio Home Skeleton (Next)
+Status: `in_progress`
+Goal: ship functional portfolio-home interactions using current page surface.
+
+Implementation checklist:
+1. Frontend layout and state model
+   - add portfolio-home two-panel layout shell (left builder, right candidate cards)
+   - define client state for positions and local-save hydration
+   - canonical targets:
+     - `frontend/src/app/demo/analysis/page.tsx`
+2. Portfolio interactions
+   - drag/add stock into portfolio with default weight
+   - weight edit and remove interactions
+   - empty-state UX for start-empty flow
+3. Candidate cards
+   - render seeded symbol cards with freshness badge (`last updated`)
+   - wire click `more` and add-to-portfolio actions
+4. Local persistence
+   - serialize and restore working portfolio from browser storage
+   - add lightweight schema version key for future migration
+
+Acceptance:
+- user can build a portfolio from empty state and recover it after page reload.
+
+### Stage P2 - Portfolio Metrics and Candidate Ranking
+Status: `pending`
+Goal: make the page useful for 1-2 minute portfolio decisions.
+
+Implementation checklist:
+1. Backend read aggregation
+   - expose projection-backed fields needed for metrics and card cues
+   - canonical targets:
+     - `backend/app/routers/workflow.py`
+     - `backend/app/workflows/analysis/projections/store.py`
+2. Portfolio metrics engine (v1)
+   - compute/render:
+     - `portfolioRiskScore`
+     - `expectedReturnRange`
+     - `sectorConcentrationWarning`
+   - recompute on all position/weight changes
+3. Candidate feed ranking/filtering
+   - implement initial ranking default (to be finalized from open decision)
+   - preserve responsiveness under cache-first policy
+
+Acceptance:
+- key metrics update correctly when portfolio constituents or weights change.
+
+### Stage P3 - Detail Reorganization and Deep Escalation
+Status: `pending`
+Goal: preserve depth while making detail readable and controllable.
+
+Implementation checklist:
+1. Reorganize detail information hierarchy
+   - summary first, evidence second, deep internals last
+2. Add explicit deep action
+   - show current analysis mode
+   - trigger deep run only from explicit user action
+3. Staleness-window UX
+   - keep cached detail visible during refresh
+   - show progression/status without blanking content
+4. Canonical targets:
+   - `frontend/src/app/demo/analysis/page.tsx`
+   - `backend/app/routers/workflow.py`
+   - `backend/app/workflows/analysis/orchestrator.py`
+
+Acceptance:
+- user can read organized detail quickly and intentionally escalate to deep analysis.
+
+### Stage P4 - Internal Observation Lab Boundary
+Status: `pending`
+Goal: keep workflow observability available internally without steering product UX.
+
+Implementation checklist:
+1. Label and bound analysis-lab role as internal.
+2. Ensure portfolio-home is the default product path.
+3. Keep lab instrumentation useful for debugging and parity checks.
+
+Acceptance:
+- team can still inspect workflow internals while primary UX remains portfolio-first.
 
 ## Phase Acceptance Gates
 
-### Module 3 Gate
-- Trigger path is stable for local use; policy hardening remains explicitly deferred in this milestone.
-- Transitions persist and stream via SSE.
-- Final artifacts/results are durable and queryable.
+### Module 4 Gate (P1/P2)
+- Portfolio-home supports add/edit/remove flows and local persistence.
+- Risk/return/concentration metrics are visible and reactive.
 
-### Module 4 Gate
-- Frontend trigger + live progress + blueprint-defined summary/drill-down rendering works from backend contracts only.
-- UX remains readable and stable for partial/failed payloads.
+### Module 5 Gate (P3)
+- Organized detail view and explicit deep escalation are working with clear state transitions.
 
-### Module 5 Gate (Phase 1 complete)
-- Research hub flow and lightweight compare flow both pass in one verified local runbook.
+### Module 6 Gate (P4, phase complete)
+- Portfolio-home and internal observation lab have clear product/tool separation.
+
+## Open Decisions (Execution-Critical)
+
+1. Default add weight: currently unresolved (`5%` proposed).
+2. Risk/return formula shape for v1: heuristic now vs model-backed now.
+3. Candidate feed default sorting: quality-first vs portfolio-impact-first.
+4. Seed refresh policy for initial ~50 stocks: manual vs scheduled.
 
 ## Product Blueprint Reference
 
