@@ -21,48 +21,58 @@ CFAI is currently structured as a frontend/backend split:
 
 ### Prerequisites
 
-- Docker + Docker Compose
-- (Optional host-side fallback) Node.js 18+, pnpm, Python 3.10+, uv
+- Node.js 18+
+- pnpm
+- Python 3.10+
+- uv
+- Neon Postgres database
 
-### Docker-First Dev (Recommended)
-
-```bash
-cp .env.example .env
-docker compose up --build
-```
-
-This starts:
-
-- frontend: `http://localhost:3000` (Next.js dev with bind-mounted source)
-- backend: `http://localhost:3001` (FastAPI uvicorn reload)
-- postgres: `localhost:5432`
-
-### Manual Migrations (Alembic)
-
-Migrations are intentionally manual (not auto-run on backend startup):
+### 1) Configure environment
 
 ```bash
-# Create a migration
-docker compose run --rm backend uv run alembic revision --autogenerate -m "describe_change"
-
-# Apply latest migrations
-docker compose run --rm backend uv run alembic upgrade head
+cp frontend/.env.example frontend/.env.local
+cp backend/.env.example backend/.env
 ```
 
-### Host-Side Fallback (Without Docker)
+Set Neon URLs from your Neon project in `backend/.env`:
+
+- `DATABASE_URL`: pooled Neon URL (runtime)
+- `DATABASE_URL_DIRECT`: direct Neon URL (migrations)
+
+### 2) Install dependencies
 
 ```bash
 pnpm --dir frontend install
 uv sync --directory backend
+```
+
+### 3) Run services from terminal
+
+```bash
 pnpm --dir frontend dev
+set -a; source backend/.env; set +a
 uv run --directory backend uvicorn app.main:app --reload --host 0.0.0.0 --port 3001
+```
+
+### Manual migrations (Alembic)
+
+Migrations are intentionally manual (not auto-run on backend startup). Load backend env vars in your terminal first:
+
+```bash
+set -a; source backend/.env; set +a
+
+# Create a migration
+uv run --directory backend alembic revision --autogenerate -m "describe_change"
+
+# Apply latest migrations
+uv run --directory backend alembic upgrade head
 ```
 
 ## Notes
 
 - Frontend dependencies and scripts are managed with `pnpm` in `frontend/`.
 - Backend dependencies and runtime are managed with `uv` in `backend/`.
-- Backend DB stack uses async SQLAlchemy + Alembic.
+- Backend DB stack uses Neon Postgres + async SQLAlchemy + Alembic.
 - Workflow runtime/domain layout:
   - shared runtime primitives: `backend/app/core/workflow/`
   - analysis workflow domain: `backend/app/workflows/analysis/`

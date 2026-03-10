@@ -128,6 +128,15 @@ Purpose: compact ADR index with only active decision signal.
   - persist one working portfolio locally in browser storage
   - defer account-backed multi-portfolio persistence to later phase
 
+### ADR-0018 - Use Neon pooled runtime URL and direct migration URL; remove Docker local stack
+- Date: 2026-03-10
+- Status: `accepted`
+- Why: deployment target is serverless/ephemeral compute, and local workflow preference is terminal-native without Docker orchestration.
+- Impact:
+  - `DATABASE_URL` is Neon pooled endpoint for backend runtime traffic.
+  - `DATABASE_URL_DIRECT` is preferred for Alembic migrations.
+  - Remove `docker-compose.yml` and Dockerfiles from active setup.
+
 ## Open Decision Candidates
 
 - Auth/rbac/quota reintroduction plan and sequencing after core milestone completion.

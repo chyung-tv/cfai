@@ -7,7 +7,7 @@ Purpose: concise target-state + current-state architecture for Phase 1.
 
 - `frontend` (Next.js App Router, shadcn/ui, Tailwind) consumes backend APIs only.
 - `backend` (FastAPI) owns orchestration, auth/policy boundary, and provider integration.
-- `postgres` is source of truth for auth, workflow state/events/artifacts, projections, and catalog.
+- Neon-managed `postgres` is source of truth for auth, workflow state/events/artifacts, projections, and catalog.
 - Product interaction hierarchy:
   - primary user surface: portfolio-home UX
   - supporting engine: analysis workflow/projections
@@ -71,6 +71,7 @@ Purpose: concise target-state + current-state architecture for Phase 1.
 - Reprojection tooling + stronger projection contract hardening.
 - Seed universe expansion beyond current top-500 proxy set.
 - Account-backed portfolio persistence and multi-portfolio management.
+- Local fallback DB story after Docker removal (if Neon unavailable during development).
 
 ## 7) Product Experience Reference
 

@@ -1,6 +1,6 @@
 # CFAI Roadmap
 
-Last validated: 2026-03-10 (portfolio-first reframe accepted; execution queue resequenced)
+Last validated: 2026-03-10 (Neon migration + split frontend/backend envs)
 Purpose: single source of execution status and next actions.
 
 ## Session Briefing (mandatory order)
@@ -9,16 +9,16 @@ Purpose: single source of execution status and next actions.
 2. What we need to implement next
 3. What we just implemented
 
-- Where we are at: core analysis engine is operational, but product direction is now portfolio-home first; analysis UI is treated as internal observation lab.
-- What we need to implement next: execute Stage P1 (portfolio home skeleton with add/edit positions, local save, candidate feed, freshness badges).
-- What we just implemented: canonical product blueprint redefined to portfolio-primary with lightweight-default/deep-explicit analysis policy.
+- Where we are at: portfolio-home is implemented as the primary route with drag/add, weight edit/remove, seeded candidates, freshness/no-cache cues, and local persistence; infra baseline now targets Neon without Docker orchestration.
+- What we need to implement next: execute Stage P2 (portfolio metrics and candidate ranking/filtering for faster 1-2 minute decisions) on top of the new Neon/terminal-native dev setup.
+- What we just implemented: Neon DB migration baseline (`DATABASE_URL` pooled + `DATABASE_URL_DIRECT` for migrations), Docker artifact removal, and env split (`frontend/.env.local`, `backend/.env`) with updated docs.
 
 ## Module Status
 
 - [x] Module 1 - Runtime foundation and workflow plumbing
 - [x] Module 2 - Projection-backed analysis read path
-- [~] Module 3 - Portfolio-first UX reframe (docs/contracts) *(active)*
-- [ ] Module 4 - Portfolio home implementation (P1/P2)
+- [x] Module 3 - Portfolio-first UX reframe (docs/contracts)
+- [~] Module 4 - Portfolio home implementation (P1/P2) *(active)*
 - [ ] Module 5 - Detail reorg + deep escalation flow (P3)
 - [ ] Module 6 - Internal observation lab boundary + milestone gate (P4)
 
@@ -26,13 +26,14 @@ Purpose: single source of execution status and next actions.
 
 - Backend analysis workflow exists end-to-end: `resolve_query` -> `deep_research` -> `structured_output` -> `reverse_dcf` -> `audit_growth_likelihood` -> `advisor_decision`.
 - Projection read model exists; `/analysis/latest` is projection-first with fallback.
-- Existing frontend page (`/demo/analysis`) contains workflow observability and rich detail content.
+- Frontend now has dedicated `/portfolio` route for primary product flow.
+- `/demo/analysis` has been reduced to internal controls/status badges for observability.
 - Product priority changed: portfolio builder is the intended user product, not workflow observability.
 - Quota guard is still deferred; auth/rbac are intentionally relaxed in local milestone flow.
 
 ## Current Focus
 
-- Active slice: Stage P1 portfolio-home skeleton and module boundaries.
+- Active slice: Stage P2 portfolio metrics and candidate ranking/filtering (with Neon-backed terminal-native environment).
 - Owners: user + coding agent.
 - Blockers: see `./debuglog.md`.
 
@@ -44,23 +45,23 @@ Status: `completed`
 - Lock policy: lightweight default + explicit deep.
 - Lock persistence policy: local save only for v1.
 
-### Stage P1 - Portfolio Home Skeleton (Next)
-Status: `in_progress`
-Goal: ship functional portfolio-home interactions using current page surface.
+### Stage P1 - Portfolio Home Skeleton (Done)
+Status: `completed`
+Goal: ship functional portfolio-home interactions using dedicated portfolio route.
 
 Implementation checklist:
 1. Frontend layout and state model
    - add portfolio-home two-panel layout shell (left builder, right candidate cards)
    - define client state for positions and local-save hydration
    - canonical targets:
-     - `frontend/src/app/demo/analysis/page.tsx`
+     - `frontend/src/app/portfolio/page.tsx`
 2. Portfolio interactions
    - drag/add stock into portfolio with default weight
    - weight edit and remove interactions
    - empty-state UX for start-empty flow
 3. Candidate cards
-   - render seeded symbol cards with freshness badge (`last updated`)
-   - wire click `more` and add-to-portfolio actions
+   - render seeded symbol cards with freshness/no-cache cue
+   - wire drag-to-add (required) and click add-to-portfolio action
 4. Local persistence
    - serialize and restore working portfolio from browser storage
    - add lightweight schema version key for future migration
@@ -138,7 +139,7 @@ Acceptance:
 
 ## Open Decisions (Execution-Critical)
 
-1. Default add weight: currently unresolved (`5%` proposed).
+1. Default add weight: fixed to `5%` for P1; revisit only if user requests rebalance behavior.
 2. Risk/return formula shape for v1: heuristic now vs model-backed now.
 3. Candidate feed default sorting: quality-first vs portfolio-impact-first.
 4. Seed refresh policy for initial ~50 stocks: manual vs scheduled.

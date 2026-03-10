@@ -41,7 +41,8 @@ backend/.venv/
 .env.test.local
 .env.production.local
 .env*
-!.env.example
+!frontend/.env.example
+!backend/.env.example
 *.env.production
 
 # Tooling caches / deployment

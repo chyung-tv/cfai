@@ -24,10 +24,8 @@ def _as_bool(name: str, default: bool) -> bool:
 @dataclass(frozen=True)
 class Settings:
     app_env: str = os.getenv("APP_ENV", "development")
-    database_url: str = os.getenv(
-        "DATABASE_URL",
-        "postgresql+asyncpg://cfai:cfai@localhost:5432/cfai",
-    )
+    database_url: str = os.getenv("DATABASE_URL", "")
+    database_url_direct: str = os.getenv("DATABASE_URL_DIRECT", "")
     frontend_url: str = os.getenv("FRONTEND_URL", "http://localhost:3000")
     google_oauth_client_id: str = os.getenv("GOOGLE_OAUTH_CLIENT_ID", "")
     google_oauth_client_secret: str = os.getenv("GOOGLE_OAUTH_CLIENT_SECRET", "")

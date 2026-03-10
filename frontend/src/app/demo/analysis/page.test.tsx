@@ -1,38 +1,8 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { beforeEach, afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import AnalysisDemoPage from "./page";
-
-const fullPayload = {
-  summary: {
-    investmentThesis: {
-      text: "High-margin compounder with disciplined capital allocation.",
-    },
-    businessQuality: {
-      tier: "A",
-      subfactors: {
-        moatStrength: "Strong ecosystem lock-in",
-        managementExecution: "Consistently beats guidance",
-        industryPositioning: "Category leader in premium segment",
-      },
-    },
-    valuationLegitimacy: {
-      label: "Legitimate",
-      basis: "median required CAGR 11.2%, median likelihood likely",
-    },
-    analysisFreshness: {
-      isFresh: true,
-    },
-  },
-  details: {
-    structuredOutput: {
-      executiveSummary: {
-        summary: "Fallback thesis text",
-      },
-    },
-  },
-};
 
 describe("AnalysisDemoPage", () => {
   const fetchMock = vi.fn();
@@ -46,70 +16,36 @@ describe("AnalysisDemoPage", () => {
     vi.clearAllMocks();
   });
 
-  it("renders summary-first cards from summary contract data", async () => {
-    fetchMock.mockResolvedValueOnce({
-      ok: true,
-      json: async () => fullPayload,
-    });
-
+  it("renders internal-lab controls and badges", () => {
     render(<AnalysisDemoPage />);
-    await userEvent.click(screen.getByRole("button", { name: "Refresh from DB" }));
 
-    await screen.findByText("Legitimate");
-    expect(screen.getByText("A")).toBeInTheDocument();
-    expect(screen.getByText("High-margin compounder with disciplined capital allocation.")).toBeInTheDocument();
-    expect(screen.getByRole("tab", { name: "Deep Research" })).toBeInTheDocument();
-    expect(screen.getByRole("tab", { name: "Quant" })).toBeInTheDocument();
-    expect(screen.getByRole("tab", { name: "Decision" })).toBeInTheDocument();
-    expect(screen.getByRole("tab", { name: "Raw" })).toBeInTheDocument();
+    expect(screen.getByText("Analysis Observation Lab (Internal)")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Trigger Workflow" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Refresh from DB" })).toBeInTheDocument();
+    expect(screen.getByText("idle")).toBeInTheDocument();
+    expect(screen.getByText("Freshness unknown")).toBeInTheDocument();
   });
 
-  it("shows explicit placeholders when summary fields are missing", async () => {
+  it("shows loaded status and freshness badge on successful refresh", async () => {
     fetchMock.mockResolvedValueOnce({
       ok: true,
       json: async () => ({
         summary: {
-          investmentThesis: { text: null },
-          businessQuality: { tier: null, subfactors: {} },
-          valuationLegitimacy: { label: null, basis: null },
-          analysisFreshness: { isFresh: null },
+          analysisFreshness: {
+            isFresh: true,
+          },
         },
-        details: {},
       }),
     });
 
     render(<AnalysisDemoPage />);
     await userEvent.click(screen.getByRole("button", { name: "Refresh from DB" }));
 
-    await screen.findAllByText("Unavailable in current payload");
-    expect(screen.getAllByText("Partial").length).toBeGreaterThan(0);
+    await screen.findByText("completed_cached / latest_loaded");
+    expect(screen.getByText("Fresh (<=7d)")).toBeInTheDocument();
   });
 
-  it("keeps drill-down navigation visible through loading transitions", async () => {
-    let resolveFetch: ((value: { ok: boolean; json: () => Promise<unknown> }) => void) | null = null;
-    fetchMock.mockImplementationOnce(
-      () =>
-        new Promise((resolve) => {
-          resolveFetch = resolve;
-        }),
-    );
-
-    render(<AnalysisDemoPage />);
-    await userEvent.click(screen.getByRole("button", { name: "Refresh from DB" }));
-
-    expect(screen.getByRole("button", { name: "Loading..." })).toBeDisabled();
-    expect(screen.getByRole("tab", { name: "Deep Research" })).toBeInTheDocument();
-    expect(screen.getByRole("tab", { name: "Quant" })).toBeInTheDocument();
-
-    resolveFetch?.({
-      ok: true,
-      json: async () => fullPayload,
-    });
-
-    await screen.findByText("Legitimate");
-  });
-
-  it("shows an error alert while keeping summary and tabs stable", async () => {
+  it("shows an error alert when refresh fails", async () => {
     fetchMock.mockResolvedValueOnce({
       ok: false,
       status: 500,
@@ -121,8 +57,6 @@ describe("AnalysisDemoPage", () => {
     await waitFor(() => {
       expect(screen.getByText("Analysis error")).toBeInTheDocument();
     });
-    expect(screen.getByRole("tab", { name: "Deep Research" })).toBeInTheDocument();
-    expect(screen.getByRole("tab", { name: "Decision" })).toBeInTheDocument();
-    expect(screen.getByText("Summary Cards")).toBeInTheDocument();
+    expect(screen.getByText("failed / latest_fetch_failed")).toBeInTheDocument();
   });
 });
