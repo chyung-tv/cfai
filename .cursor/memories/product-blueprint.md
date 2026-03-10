@@ -63,7 +63,7 @@ Goal: lock a stable summary contract from existing projection payload.
   - `analysisFreshness`
 - Keep `contract_version` discipline in projection normalizer.
 - Dev/test LLM runtime policy for full workflow cost control:
-  - deep-research node stays in workflow but defaults to `gemini3.1-flash-lite`
+  - deep-research node stays in workflow but defaults to `gemini-3.1-flash-lite-preview`
   - dev deep-research flash-lite path enables grounding by default (`DEEP_RESEARCH_DEV_GROUNDING_ENABLED=true`)
   - production may route deep-research node to deep-research endpoint while non-deep-research nodes remain flash-lite
 - Canonical backend mapping:

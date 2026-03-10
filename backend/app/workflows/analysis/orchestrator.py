@@ -244,7 +244,8 @@ class WorkflowOrchestrator:
                     {"hasResult": workflow.result_payload is not None},
                 )
             except Exception as exc:
-                workflow.error_message = str(exc)
+                # Keep DB writes safe: error_message column is VARCHAR(500).
+                workflow.error_message = str(exc)[:500]
                 await db.commit()
                 await self._runtime.emit(
                     db,

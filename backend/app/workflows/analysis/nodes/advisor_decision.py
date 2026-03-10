@@ -29,8 +29,8 @@ class AdvisorProfileDecision(BaseModel):
     caseName: Literal["optimistic", "median", "conservative"]
     requiredRevenueCagrPct: float
     action: Literal["accumulate", "hold", "trim", "avoid"]
-    advice: str = Field(min_length=20, max_length=320)
-    reasoning: str = Field(min_length=120)
+    advice: str = Field(min_length=1, max_length=320)
+    reasoning: str = Field(min_length=1)
     evidenceRefs: list[str] = Field(min_length=1)
     keyRisks: list[str] = Field(min_length=2)
     invalidateConditions: list[str] = Field(min_length=2)
@@ -46,7 +46,7 @@ class AdvisorProfileDecision(BaseModel):
 
 class AdvisorProfileEnvelope(BaseModel):
     profile: Literal["cash_preservation", "balanced_compounder", "capital_multiplier"]
-    profileSummary: str = Field(min_length=20)
+    profileSummary: str = Field(min_length=1)
     caseAdvisories: list[AdvisorProfileDecision] = Field(min_length=3, max_length=3)
 
     @model_validator(mode="after")

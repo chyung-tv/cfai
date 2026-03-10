@@ -1,6 +1,6 @@
 # CFAI Architecture Decisions
 
-Last validated: 2026-03-09 (research-hub blueprint decisions added)
+Last validated: 2026-03-09 (local-dev policy bypass + runtime stability notes)
 Purpose: compact ADR index with only active decision signal.
 
 ## Status Keys
@@ -76,9 +76,27 @@ Purpose: compact ADR index with only active decision signal.
 - Why: one-click flow should feel fast while still allowing refreshed analysis.
 - Impact: if analysis is fresh show immediately; if stale trigger refresh and stream updates.
 
+### ADR-0012 - Dev/test deep-research uses flash-lite preview with grounding; production keeps deep-research endpoint path
+- Date: 2026-03-09
+- Status: `accepted`
+- Why: local workflow testing must remain low-cost while preserving full node-chain behavior and research grounding.
+- Impact:
+  - Dev/Test: deep-research node runs with `gemini-3.1-flash-lite-preview` and grounding enabled by env toggle.
+  - Production: deep-research node can route to deep-research endpoint/model; non-deep-research structured nodes remain flash-lite.
+  - Environment control is env-only (`APP_ENV`, `DEEP_RESEARCH_USE_ENDPOINT_IN_PRODUCTION`, `DEEP_RESEARCH_DEV_GROUNDING_ENABLED`, model env vars).
+
+### ADR-0013 - Temporarily disable auth/rbac guards for local core milestone execution
+- Date: 2026-03-09
+- Status: `accepted`
+- Why: unblock rapid core workflow/UX iteration while policy hardening is explicitly deferred in the local-first milestone.
+- Impact:
+  - Remove `require_auth` enforcement on `/analysis/trigger` and allow `user_id=None`.
+  - Remove admin role guards on maintenance seed routes in local dev flow.
+  - Reintroduce auth/rbac/quota guards as a follow-up hardening slice after core milestone completion.
+
 ## Open Decision Candidates
 
-- Auth policy for analysis read/event endpoints (`public` vs `auth-required`).
+- Auth/rbac/quota reintroduction plan and sequencing after core milestone completion.
 - Quota model details (limits, reset cadence, role overrides, error semantics).
 
 ## References

@@ -2,10 +2,8 @@ from __future__ import annotations
 
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, HTTPException
 
-from app.dependencies.auth import require_role
-from app.models.user import User
 from app.workflows.maintenance.seed_service import CatalogSeedService
 
 
@@ -13,16 +11,13 @@ def create_maintenance_router(seed_service: CatalogSeedService) -> APIRouter:
     router = APIRouter(prefix="/api/v1/admin/maintenance", tags=["maintenance"])
 
     @router.post("/catalog/seed/top500-us")
-    async def trigger_top500_seed(
-        _: User = Depends(require_role("admin")),
-    ) -> dict[str, str]:
+    async def trigger_top500_seed() -> dict[str, str]:
         run_id = await seed_service.start_top500_us_seed()
         return {"status": "processing", "runId": run_id}
 
     @router.get("/catalog/seed-runs/{run_id}")
     async def get_seed_run(
         run_id: str,
-        _: User = Depends(require_role("admin")),
     ) -> dict[str, Any]:
         run = await seed_service.get_run(run_id)
         if run is None:
@@ -48,9 +43,7 @@ def create_maintenance_router(seed_service: CatalogSeedService) -> APIRouter:
         }
 
     @router.get("/catalog/seed-runs")
-    async def list_seed_runs(
-        _: User = Depends(require_role("admin")),
-    ) -> dict[str, list[dict[str, Any]]]:
+    async def list_seed_runs() -> dict[str, list[dict[str, Any]]]:
         rows = await seed_service.list_runs()
         return {
             "runs": [

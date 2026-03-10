@@ -1,6 +1,6 @@
 # CFAI Roadmap
 
-Last validated: 2026-03-09 (blueprint canonicalized)
+Last validated: 2026-03-09 (Stage 1 shipped + local-dev hardening and runtime fixes)
 Purpose: single source of execution status and next actions.
 
 ## Session Briefing (mandatory order)
@@ -9,9 +9,9 @@ Purpose: single source of execution status and next actions.
 2. What we need to implement next
 3. What we just implemented
 
-- Where we are at: Modules 1-2 are complete; core analysis workflow + projection read model + demo UI are implemented and usable locally.
-- What we need to implement next: execute the next blueprint stage from `product-blueprint.md`.
-- What we just implemented: consolidated product-definition content into canonical blueprint and reduced duplicate specs in other memories.
+- Where we are at: Modules 1-2 are complete; Stage 0 and Stage 1 are implemented with summary-first `/analysis/latest` UX active and usable in `/demo/analysis`.
+- What we need to implement next: execute Stage 2 staleness-window flow (show latest immediately, refresh stale in background with visible progression).
+- What we just implemented: local-dev hardening after Stage 1 (auth guard temporary bypass for core milestone, CORS alignment for localhost/0.0.0.0 origins, advisor schema strictness relaxation, and workflow failure persistence fix).
 
 ## Module Status
 
@@ -27,8 +27,10 @@ Purpose: single source of execution status and next actions.
 - Projection read model exists and `/analysis/latest` reads from `analysis_workflow_projections` with fallback.
 - Maintenance seed domain exists with admin endpoints and run tracking.
 - Frontend `/demo/analysis` exists with tabs-first IA and SSE timeline.
-- Quota guard is not implemented in backend yet.
-- Auth is enforced on trigger, but not consistently enforced across all analysis read/event routes.
+- Quota guard is not implemented in backend yet (explicitly deferred in local-first milestone).
+- Auth/rbac guards are intentionally disabled across analysis and maintenance routes for local core milestone velocity; restore policy gates after core milestone completion.
+- Analysis failure persistence no longer crashes on oversized error strings (`error_message` now safely truncated to DB column length).
+- `/demo/analysis` usability polish applied (font token fix, compact pipeline chips, improved spacing/tab behavior).
 
 ## Current Focus
 
@@ -38,12 +40,13 @@ Purpose: single source of execution status and next actions.
 
 ## Next Execution Queue
 
-1. Execute Stage 0 from `./product-blueprint.md`.
-2. Execute Stage 1 from `./product-blueprint.md`.
-3. Execute Stage 2 from `./product-blueprint.md`.
-4. Execute Stage 3 from `./product-blueprint.md`.
-5. Execute Stage 4 from `./product-blueprint.md`.
-6. Run local acceptance checks per stage and record outcomes here.
+1. Execute Stage 2 from `./product-blueprint.md`:
+   - implement staleness-window UX (show latest immediately, refresh stale in background)
+2. Execute Stage 3 from `./product-blueprint.md`:
+   - projection-backed compare endpoint + sortable table
+3. Execute Stage 4 from `./product-blueprint.md`:
+   - normalized compare keys and retention baseline
+4. Run local acceptance checks per stage and record outcomes here.
 
 ## Phase Acceptance Gates
 

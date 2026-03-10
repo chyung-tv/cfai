@@ -12,11 +12,9 @@ from sqlalchemy import desc, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.session import get_db
-from app.dependencies.auth import require_auth
 from app.models.workflow.analysis_workflow import AnalysisWorkflow
 from app.models.workflow.analysis_workflow_event import AnalysisWorkflowEvent
 from app.models.workflow.analysis_workflow_projection import AnalysisWorkflowProjection
-from app.models.user import User
 from app.workflows.analysis.projections.normalizer import normalize_projection_payload
 from app.workflows.analysis.projections.store import upsert_workflow_projection
 from app.workflows.analysis.orchestrator import WorkflowOrchestrator
@@ -57,7 +55,6 @@ def create_workflow_router(
     async def trigger_analysis(
         body: TriggerBody,
         force: bool = Query(default=False),
-        current_user: User = Depends(require_auth),
         db: AsyncSession = Depends(get_db),
     ) -> dict[str, str]:
         symbol = body.symbol.strip().upper()
@@ -67,7 +64,7 @@ def create_workflow_router(
             db=db,
             symbol=symbol,
             force_refresh=force,
-            user_id=current_user.id,
+            user_id=None,
         )
         return {"status": "processing", "traceId": workflow_id}
 
