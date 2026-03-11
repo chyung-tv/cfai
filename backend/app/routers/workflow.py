@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections.abc import AsyncGenerator
 from datetime import UTC, datetime, timedelta
 import copy
-from typing import Any
+from typing import Any, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import StreamingResponse
@@ -11,12 +11,20 @@ from pydantic import BaseModel
 from sqlalchemy import desc, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import settings
 from app.db.session import get_db
 from app.models.workflow.analysis_candidate_card import AnalysisCandidateCard
+from app.models.workflow.stock_catalog import StockCatalog
 from app.models.workflow.analysis_workflow import AnalysisWorkflow
 from app.models.workflow.analysis_workflow_event import AnalysisWorkflowEvent
 from app.models.workflow.analysis_symbol_snapshot import AnalysisSymbolSnapshot
 from app.workflows.analysis.orchestrator import WorkflowOrchestrator
+from app.workflows.analysis.projections.store import (
+    portfolio_impact_signal_score,
+    quality_score_value,
+    recent_change_signal_score,
+    valuation_signal_score,
+)
 from app.workflows.analysis.sse import SseBroker
 
 ANALYSIS_FRESHNESS_TTL = timedelta(days=7)
@@ -38,6 +46,31 @@ def _with_freshness(payload: dict[str, Any], updated_at: datetime | None) -> dic
     threshold = datetime.now(UTC) - ANALYSIS_FRESHNESS_TTL
     freshness["isFresh"] = updated_at >= threshold
     return enriched
+
+
+def _is_fresh_from_timestamps(
+    *,
+    freshness_updated_at: datetime | None,
+    freshness_expires_at: datetime | None,
+) -> bool | None:
+    now = datetime.now(UTC)
+    if freshness_expires_at is not None:
+        return freshness_expires_at >= now
+    if freshness_updated_at is not None:
+        return freshness_updated_at >= (now - ANALYSIS_FRESHNESS_TTL)
+    return None
+
+
+def _expected_return_range(
+    quality: float,
+    valuation: float,
+    portfolio_impact: float,
+) -> dict[str, float]:
+    # Heuristic v1 range, bounded for stable UX output.
+    midpoint = 2.0 + (quality * 12.0) + (valuation * 8.0) - ((1.0 - portfolio_impact) * 4.0)
+    low = max(-8.0, midpoint - 5.0)
+    high = min(35.0, midpoint + 5.0)
+    return {"lowPct": round(low, 1), "highPct": round(high, 1)}
 
 
 class TriggerBody(BaseModel):
@@ -147,36 +180,193 @@ def create_workflow_router(
 
     @router.get("/candidates")
     async def get_candidate_cards(
+        sort_by: Literal["blended", "quality", "portfolio_impact", "valuation_recent"] = Query(
+            default="blended"
+        ),
+        quality_weight: float = Query(default=0.4, ge=0.0, le=1.0),
+        portfolio_impact_weight: float = Query(default=0.3, ge=0.0, le=1.0),
+        valuation_recent_weight: float = Query(default=0.3, ge=0.0, le=1.0),
         limit: int = Query(default=100, ge=1, le=500),
         db: AsyncSession = Depends(get_db),
     ) -> dict[str, Any]:
         result = await db.execute(
-            select(AnalysisCandidateCard)
-            .order_by(
-                desc(AnalysisCandidateCard.quality_score),
-                desc(AnalysisCandidateCard.freshness_updated_at),
+            select(AnalysisCandidateCard, StockCatalog.name_display, StockCatalog.sector)
+            .outerjoin(StockCatalog, StockCatalog.id == AnalysisCandidateCard.catalog_id)
+            .order_by(desc(AnalysisCandidateCard.updated_at))
+            .limit(500)
+        )
+        rows = result.all()
+        total_weight = quality_weight + portfolio_impact_weight + valuation_recent_weight
+        if total_weight <= 0:
+            quality_weight = 0.4
+            portfolio_impact_weight = 0.3
+            valuation_recent_weight = 0.3
+            total_weight = 1.0
+
+        def _build_card(row: Any) -> dict[str, Any]:
+            card, name_display, sector = row
+            quality_component = quality_score_value(card.quality_score)
+            valuation_component = valuation_signal_score(card.valuation_signal)
+            recent_change_component = recent_change_signal_score(card.recent_change_signal)
+            portfolio_impact_component = portfolio_impact_signal_score(card.portfolio_impact_signal)
+            valuation_recent_component = round(
+                (valuation_component + recent_change_component) / 2.0,
+                4,
             )
+            blended_score = round(
+                (
+                    (quality_component * quality_weight)
+                    + (portfolio_impact_component * portfolio_impact_weight)
+                    + (valuation_recent_component * valuation_recent_weight)
+                )
+                / total_weight,
+                4,
+            )
+            expected_return = _expected_return_range(
+                quality=quality_component,
+                valuation=valuation_component,
+                portfolio_impact=portfolio_impact_component,
+            )
+            return {
+                "symbol": card.symbol,
+                "name": name_display,
+                "sector": sector,
+                "qualityScore": card.quality_score,
+                "valuationSignal": card.valuation_signal,
+                "recentChangeSignal": card.recent_change_signal,
+                "portfolioImpactSignal": card.portfolio_impact_signal,
+                "freshnessUpdatedAt": card.freshness_updated_at.isoformat()
+                if card.freshness_updated_at
+                else None,
+                "freshnessExpiresAt": card.freshness_expires_at.isoformat()
+                if card.freshness_expires_at
+                else None,
+                "isFresh": _is_fresh_from_timestamps(
+                    freshness_updated_at=card.freshness_updated_at,
+                    freshness_expires_at=card.freshness_expires_at,
+                ),
+                "scores": {
+                    "quality": quality_component,
+                    "valuation": valuation_component,
+                    "recentChange": recent_change_component,
+                    "valuationRecent": valuation_recent_component,
+                    "portfolioImpact": portfolio_impact_component,
+                    "blended": blended_score,
+                    "portfolioRisk": round(1.0 - portfolio_impact_component, 4),
+                },
+                "expectedReturnRange": expected_return,
+                "payload": card.card_payload,
+            }
+
+        cards = [_build_card(row) for row in rows]
+
+        def _sort_score(card: dict[str, Any]) -> float:
+            scores = card.get("scores")
+            if not isinstance(scores, dict):
+                return 0.0
+            if sort_by == "quality":
+                return float(scores.get("quality") or 0.0)
+            if sort_by == "portfolio_impact":
+                return float(scores.get("portfolioImpact") or 0.0)
+            if sort_by == "valuation_recent":
+                return float(scores.get("valuationRecent") or 0.0)
+            return float(scores.get("blended") or 0.0)
+
+        cards.sort(key=lambda item: (-_sort_score(item), item["symbol"]))
+        limited_cards = cards[:limit]
+        return {
+            "sortBy": sort_by,
+            "weights": {
+                "quality": quality_weight,
+                "portfolioImpact": portfolio_impact_weight,
+                "valuationRecent": valuation_recent_weight,
+            },
+            "cards": limited_cards,
+        }
+
+    @router.get("/workflows/{trace_id}/status")
+    async def get_workflow_status(
+        trace_id: str,
+        db: AsyncSession = Depends(get_db),
+    ) -> dict[str, Any]:
+        workflow_result = await db.execute(
+            select(AnalysisWorkflow).where(AnalysisWorkflow.id == trace_id)
+        )
+        workflow = workflow_result.scalar_one_or_none()
+        if workflow is None:
+            raise HTTPException(status_code=404, detail="workflow not found")
+        last_event_result = await db.execute(
+            select(AnalysisWorkflowEvent)
+            .where(AnalysisWorkflowEvent.workflow_id == trace_id)
+            .order_by(desc(AnalysisWorkflowEvent.created_at))
+            .limit(1)
+        )
+        last_event = last_event_result.scalar_one_or_none()
+        now = datetime.now(UTC)
+        started_at = workflow.started_at or workflow.created_at
+        elapsed_seconds = int((now - started_at).total_seconds()) if started_at else 0
+        last_event_at = last_event.created_at if last_event is not None else None
+        stale_threshold = max(10, settings.workflow_stale_progress_threshold_seconds)
+        elapsed_without_progress = (
+            int((now - last_event_at).total_seconds()) if last_event_at is not None else elapsed_seconds
+        )
+        is_stale = workflow.state == "running" and elapsed_without_progress >= stale_threshold
+        return {
+            "id": workflow.id,
+            "symbol": workflow.symbol,
+            "state": workflow.state,
+            "substate": workflow.substate,
+            "createdAt": workflow.created_at.isoformat(),
+            "startedAt": started_at.isoformat() if started_at else None,
+            "lastEventAt": last_event_at.isoformat() if last_event_at else None,
+            "lastEventType": last_event.event_type if last_event else None,
+            "elapsedSec": elapsed_seconds,
+            "elapsedWithoutProgressSec": elapsed_without_progress,
+            "staleThresholdSec": stale_threshold,
+            "isStale": is_stale,
+            "errorCode": workflow.error_code,
+            "errorMessage": workflow.error_message,
+        }
+
+    @router.get("/workflows/{trace_id}/timeline")
+    async def get_workflow_timeline(
+        trace_id: str,
+        limit: int = Query(default=500, ge=1, le=5000),
+        db: AsyncSession = Depends(get_db),
+    ) -> dict[str, Any]:
+        workflow_result = await db.execute(
+            select(AnalysisWorkflow).where(AnalysisWorkflow.id == trace_id)
+        )
+        workflow = workflow_result.scalar_one_or_none()
+        if workflow is None:
+            raise HTTPException(status_code=404, detail="workflow not found")
+        events_result = await db.execute(
+            select(AnalysisWorkflowEvent)
+            .where(AnalysisWorkflowEvent.workflow_id == trace_id)
+            .order_by(AnalysisWorkflowEvent.seq_no.asc())
             .limit(limit)
         )
-        rows = result.scalars().all()
+        events = events_result.scalars().all()
         return {
-            "cards": [
+            "id": workflow.id,
+            "symbol": workflow.symbol,
+            "state": workflow.state,
+            "events": [
                 {
-                    "symbol": row.symbol,
-                    "qualityScore": row.quality_score,
-                    "valuationSignal": row.valuation_signal,
-                    "recentChangeSignal": row.recent_change_signal,
-                    "portfolioImpactSignal": row.portfolio_impact_signal,
-                    "freshnessUpdatedAt": row.freshness_updated_at.isoformat()
-                    if row.freshness_updated_at
+                    "id": event.id,
+                    "seqNo": event.seq_no,
+                    "state": event.state,
+                    "substate": event.substate,
+                    "eventType": event.event_type,
+                    "message": event.message,
+                    "payload": event.payload,
+                    "durationMs": event.payload.get("durationMs")
+                    if isinstance(event.payload, dict)
                     else None,
-                    "freshnessExpiresAt": row.freshness_expires_at.isoformat()
-                    if row.freshness_expires_at
-                    else None,
-                    "payload": row.card_payload,
+                    "createdAt": event.created_at.isoformat(),
                 }
-                for row in rows
-            ]
+                for event in events
+            ],
         }
 
     @router.get("/history")

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
+import logging
 from typing import Any
 
 from sqlalchemy import func, select
@@ -12,6 +13,8 @@ from app.models.workflow.analysis_workflow_artifact import AnalysisWorkflowArtif
 from app.models.workflow.analysis_workflow_event import AnalysisWorkflowEvent
 from app.workflows.analysis.projections.store import upsert_workflow_projection
 from app.workflows.analysis.sse import SseBroker
+
+logger = logging.getLogger(__name__)
 
 
 class WorkflowRuntime:
@@ -56,33 +59,15 @@ class WorkflowRuntime:
             workflow.error_code = None
         if state == WorkflowState.failed:
             workflow.failed_at = datetime.now(timezone.utc)
-        event_seq = await self._next_event_seq(db=db, workflow_id=workflow.id)
-        event = AnalysisWorkflowEvent(
-            workflow_id=workflow.id,
-            seq_no=event_seq,
-            state=state.value,
-            substate=substate,
+        await self._append_event(
+            db=db,
+            workflow=workflow,
             event_type="transition",
+            state=state,
+            substate=substate,
             message=message,
             payload=payload,
-        )
-        db.add(event)
-        await upsert_workflow_projection(
-            db,
-            workflow,
-            message=message,
-            latest_event_at=datetime.now(timezone.utc),
-        )
-        await db.commit()
-        await self._sse_broker.publish(
-            Transition(
-                workflow_id=workflow.id,
-                symbol=workflow.symbol,
-                state=state,
-                substate=substate,
-                message=message,
-                payload=payload,
-            )
+            update_projection=True,
         )
 
     async def fail(
@@ -103,6 +88,27 @@ class WorkflowRuntime:
             substate=substate,
             message=message,
             payload=payload,
+        )
+
+    async def emit_progress(
+        self,
+        db: AsyncSession,
+        workflow: AnalysisWorkflow,
+        *,
+        event_type: str,
+        substate: str | None,
+        message: str,
+        payload: dict[str, Any] | None = None,
+    ) -> None:
+        await self._append_event(
+            db=db,
+            workflow=workflow,
+            event_type=event_type,
+            state=self._as_workflow_state(workflow.state),
+            substate=substate,
+            message=message,
+            payload=payload,
+            update_projection=False,
         )
 
     async def persist_artifact(
@@ -144,6 +150,61 @@ class WorkflowRuntime:
             artifact_payload=payload,
         )
 
+    async def _append_event(
+        self,
+        *,
+        db: AsyncSession,
+        workflow: AnalysisWorkflow,
+        event_type: str,
+        state: WorkflowState,
+        substate: str | None,
+        message: str,
+        payload: dict[str, Any] | None,
+        update_projection: bool,
+    ) -> None:
+        event_seq = await self._next_event_seq(db=db, workflow_id=workflow.id)
+        event = AnalysisWorkflowEvent(
+            workflow_id=workflow.id,
+            seq_no=event_seq,
+            state=state.value,
+            substate=substate,
+            event_type=event_type,
+            message=message,
+            payload=payload,
+        )
+        db.add(event)
+        event_at = datetime.now(timezone.utc)
+        if update_projection:
+            await upsert_workflow_projection(
+                db,
+                workflow,
+                message=message,
+                latest_event_at=event_at,
+            )
+        await db.commit()
+        logger.info(
+            "workflow_event trace_id=%s symbol=%s state=%s substate=%s event_type=%s message=%s",
+            workflow.id,
+            workflow.symbol,
+            state.value,
+            substate,
+            event_type,
+            message,
+        )
+        sse_payload: dict[str, Any] = {"eventType": event_type}
+        if payload:
+            sse_payload.update(payload)
+        await self._sse_broker.publish(
+            Transition(
+                workflow_id=workflow.id,
+                symbol=workflow.symbol,
+                state=state,
+                substate=substate,
+                message=message,
+                payload=sse_payload,
+            )
+        )
+
     @classmethod
     def _validate_transition(cls, previous_state: str, next_state: str) -> None:
         allowed = cls._ALLOWED_TRANSITIONS.get(previous_state, set())
@@ -158,3 +219,10 @@ class WorkflowRuntime:
         )
         current = result.scalar_one_or_none()
         return int(current or 0) + 1
+
+    @staticmethod
+    def _as_workflow_state(raw_state: str) -> WorkflowState:
+        try:
+            return WorkflowState(raw_state)
+        except ValueError:
+            return WorkflowState.running

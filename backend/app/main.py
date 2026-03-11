@@ -38,7 +38,10 @@ fmp_client = FmpClient(
     timeout_seconds=settings.fmp_timeout_seconds,
 )
 gemini_client = GeminiDeepResearchClient(
-    api_key=settings.google_api_key,
+    vertex_api_key=settings.vertex_ai_api_key,
+    vertex_project_id=settings.vertex_ai_project_id,
+    vertex_location=settings.vertex_ai_location,
+    use_vertex_ai=settings.google_genai_use_vertexai,
     app_env=settings.app_env,
     agent=settings.deep_research_agent,
     deep_research_dev_model=settings.deep_research_dev_model,
@@ -59,6 +62,8 @@ workflow_orchestrator = WorkflowOrchestrator(
 seed_service = CatalogSeedService(
     fmp_client=fmp_client,
     session_factory=AsyncSessionLocal,
+    target_catalog_size=settings.maintenance_seed_target_count,
+    min_market_cap=settings.maintenance_seed_min_market_cap,
 )
 app.include_router(auth_router)
 app.include_router(create_workflow_router(workflow_orchestrator, broker))

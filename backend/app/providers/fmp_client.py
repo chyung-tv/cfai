@@ -55,6 +55,7 @@ class FmpClient:
         is_actively_trading: bool,
         is_etf: bool,
         is_fund: bool,
+        market_cap_more_than: int | None = None,
         limit: int,
     ) -> FmpCallResult:
         params = {
@@ -64,20 +65,26 @@ class FmpClient:
             "isFund": str(is_fund).lower(),
             "limit": limit,
         }
+        if market_cap_more_than is not None and market_cap_more_than > 0:
+            params["marketCapMoreThan"] = int(market_cap_more_than)
         try:
-            data = await asyncio.to_thread(
-                fmpsdk.stock_screener,
-                apikey=self._api_key,
-                country=country,
-                is_actively_trading=is_actively_trading,
-                is_etf=is_etf,
-                is_fund=is_fund,
-                limit=limit,
+            data = await asyncio.wait_for(
+                asyncio.to_thread(
+                    fmpsdk.stock_screener,
+                    apikey=self._api_key,
+                    country=country,
+                    is_actively_trading=is_actively_trading,
+                    is_etf=is_etf,
+                    is_fund=is_fund,
+                    market_cap_more_than=market_cap_more_than,
+                    limit=limit,
+                ),
+                timeout=self._timeout_seconds,
             )
             normalized = self._normalize_sdk_rows(data, sdk_method="stock_screener")
             if normalized:
                 return FmpCallResult(data=normalized, endpoint="fmpsdk.stock_screener")
-        except FmpClientError:
+        except (FmpClientError, TimeoutError):
             pass
 
         return await self._request_with_fallback(
@@ -91,15 +98,18 @@ class FmpClient:
     async def fetch_profile_by_symbol(self, symbol: str) -> FmpCallResult:
         normalized = symbol.strip().upper()
         try:
-            data = await asyncio.to_thread(
-                fmpsdk.company_profile,
-                apikey=self._api_key,
-                symbol=normalized,
+            data = await asyncio.wait_for(
+                asyncio.to_thread(
+                    fmpsdk.company_profile,
+                    apikey=self._api_key,
+                    symbol=normalized,
+                ),
+                timeout=self._timeout_seconds,
             )
             rows = self._normalize_sdk_rows(data, sdk_method="company_profile")
             if rows:
                 return FmpCallResult(data=rows, endpoint="fmpsdk.company_profile")
-        except FmpClientError:
+        except (FmpClientError, TimeoutError):
             pass
 
         return await self._request_with_fallback(

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 from datetime import datetime, timezone
+import logging
 from typing import Any
 from uuid import uuid4
 
@@ -12,6 +13,7 @@ from app.core.config import settings
 from app.core.workflow.runtime import WorkflowRuntime
 from app.core.workflow.types import WorkflowState
 from app.models.workflow.analysis_workflow import AnalysisWorkflow
+from app.models.workflow.analysis_workflow_event import AnalysisWorkflowEvent
 from app.models.workflow.analysis_symbol_snapshot import AnalysisSymbolSnapshot
 from app.providers.advisor_client import AdvisorClient
 from app.providers.fmp_client import FmpClient
@@ -31,6 +33,8 @@ from app.workflows.analysis.nodes.validate_input import ValidateInputNode
 from app.workflows.analysis.projections.store import upsert_workflow_projection
 from app.workflows.analysis.sse import SseBroker
 
+logger = logging.getLogger(__name__)
+
 
 class WorkflowOrchestrator:
     def __init__(
@@ -45,10 +49,18 @@ class WorkflowOrchestrator:
         self._advisor_client = advisor_client
         self._runtime = WorkflowRuntime(sse_broker)
         self._tasks: set[asyncio.Task] = set()
+        self._stall_signaled_at: dict[str, datetime] = {}
+        self._monitor_task: asyncio.Task | None = None
+        self._start_stall_monitor()
 
     def _track_task(self, task: asyncio.Task) -> None:
         self._tasks.add(task)
         task.add_done_callback(self._tasks.discard)
+
+    def _start_stall_monitor(self) -> None:
+        if self._monitor_task is not None and not self._monitor_task.done():
+            return
+        self._monitor_task = asyncio.create_task(self._monitor_running_workflows())
 
     async def start_workflow(
         self,
@@ -76,6 +88,12 @@ class WorkflowOrchestrator:
             "queued",
             "Analysis queued",
             {"forceRefresh": force_refresh},
+        )
+        logger.info(
+            "workflow_started trace_id=%s symbol=%s force_refresh=%s",
+            workflow.id,
+            workflow.symbol,
+            workflow.force_refresh,
         )
 
         task = asyncio.create_task(self._run_workflow(workflow_id))
@@ -115,36 +133,36 @@ class WorkflowOrchestrator:
                 "db": db,
             }
             try:
-                await self._runtime.emit(
-                    db,
-                    workflow,
-                    WorkflowState.running,
-                    "validate_input",
-                    "Validating input",
+                await self._run_node_step(
+                    db=db,
+                    workflow=workflow,
+                    context=context,
+                    node=ValidateInputNode(),
+                    substate="validate_input",
+                    transition_message="Validating input",
                 )
-                await ValidateInputNode().execute(context)
 
-                await self._runtime.emit(
-                    db,
-                    workflow,
-                    WorkflowState.running,
-                    "resolve_query",
-                    "Resolving query to catalog symbol",
+                await self._run_node_step(
+                    db=db,
+                    workflow=workflow,
+                    context=context,
+                    node=ResolveQueryNode(),
+                    substate="resolve_query",
+                    transition_message="Resolving query to catalog symbol",
                 )
-                await ResolveQueryNode().execute(context)
                 workflow.symbol = context["symbol"]
                 workflow.catalog_id = context.get("catalog_id")
                 await db.commit()
 
-                await self._runtime.emit(
-                    db,
-                    workflow,
-                    WorkflowState.running,
-                    "resolve_cache",
-                    "Resolving cache",
-                )
                 await self._hydrate_cached_result(db=db, workflow=workflow, context=context)
-                cache_result = await ResolveCacheNode().execute(context)
+                cache_result = await self._run_node_step(
+                    db=db,
+                    workflow=workflow,
+                    context=context,
+                    node=ResolveCacheNode(),
+                    substate="resolve_cache",
+                    transition_message="Resolving cache",
+                )
                 if cache_result.get("cache_hit"):
                     await self._runtime.emit(
                         db,
@@ -169,14 +187,14 @@ class WorkflowOrchestrator:
 
                 await self._run_deep_research(db, workflow, context)
 
-                await self._runtime.emit(
-                    db,
-                    workflow,
-                    WorkflowState.running,
-                    "structured_output",
-                    "Structuring deep research output",
+                output = await self._run_node_step(
+                    db=db,
+                    workflow=workflow,
+                    context=context,
+                    node=StructuredOutputNode(self._deep_research_client),
+                    substate="structured_output",
+                    transition_message="Structuring deep research output",
                 )
-                output = await StructuredOutputNode(self._deep_research_client).execute(context)
                 await upsert_workflow_projection(db, workflow, message="Structured output persisted")
                 await self._runtime.persist_artifact(
                     db,
@@ -186,14 +204,14 @@ class WorkflowOrchestrator:
                 )
                 await db.commit()
 
-                await self._runtime.emit(
-                    db,
-                    workflow,
-                    WorkflowState.running,
-                    "reverse_dcf",
-                    "Running reverse DCF calculation",
+                output = await self._run_node_step(
+                    db=db,
+                    workflow=workflow,
+                    context=context,
+                    node=ReverseDcfNode(self._fmp_client),
+                    substate="reverse_dcf",
+                    transition_message="Running reverse DCF calculation",
                 )
-                output = await ReverseDcfNode(self._fmp_client).execute(context)
                 await upsert_workflow_projection(db, workflow, message="Reverse DCF persisted")
                 await self._runtime.persist_artifact(
                     db,
@@ -203,14 +221,14 @@ class WorkflowOrchestrator:
                 )
                 await db.commit()
 
-                await self._runtime.emit(
-                    db,
-                    workflow,
-                    WorkflowState.running,
-                    "audit_growth_likelihood",
-                    "Auditing growth likelihood against deep research evidence",
+                output = await self._run_node_step(
+                    db=db,
+                    workflow=workflow,
+                    context=context,
+                    node=AuditGrowthLikelihoodNode(self._deep_research_client),
+                    substate="audit_growth_likelihood",
+                    transition_message="Auditing growth likelihood against deep research evidence",
                 )
-                output = await AuditGrowthLikelihoodNode(self._deep_research_client).execute(context)
                 await upsert_workflow_projection(
                     db, workflow, message="Audit growth likelihood persisted"
                 )
@@ -222,14 +240,14 @@ class WorkflowOrchestrator:
                 )
                 await db.commit()
 
-                await self._runtime.emit(
-                    db,
-                    workflow,
-                    WorkflowState.running,
-                    "advisor_decision",
-                    "Generating investor-profile advisor actions",
+                output = await self._run_node_step(
+                    db=db,
+                    workflow=workflow,
+                    context=context,
+                    node=AdvisorDecisionNode(self._advisor_client),
+                    substate="advisor_decision",
+                    transition_message="Generating investor-profile advisor actions",
                 )
-                output = await AdvisorDecisionNode(self._advisor_client).execute(context)
                 await upsert_workflow_projection(db, workflow, message="Advisor decision persisted")
                 await self._runtime.persist_artifact(
                     db,
@@ -239,14 +257,14 @@ class WorkflowOrchestrator:
                 )
                 await db.commit()
 
-                await self._runtime.emit(
-                    db,
-                    workflow,
-                    WorkflowState.running,
-                    "publish_sse",
-                    "Publishing workflow completion",
+                await self._run_node_step(
+                    db=db,
+                    workflow=workflow,
+                    context=context,
+                    node=PublishSseNode(),
+                    substate="publish_sse",
+                    transition_message="Publishing workflow completion",
                 )
-                await PublishSseNode().execute(context)
 
                 await self._runtime.emit(
                     db,
@@ -257,18 +275,184 @@ class WorkflowOrchestrator:
                     {"hasResult": True},
                 )
             except Exception as exc:
-                # Keep DB writes safe: error_message column is VARCHAR(500).
-                workflow.error_message = str(exc)[:500]
-                workflow.error_code = "analysis_failed"
-                await db.commit()
-                await self._runtime.fail(
-                    db,
-                    workflow,
-                    substate="failed",
-                    message="Analysis failed",
-                    error_code="analysis_failed",
-                    payload={"error": str(exc)},
+                await self._fail_workflow_isolated(
+                    workflow_id=workflow.id,
+                    error=str(exc),
                 )
+                logger.exception(
+                    "workflow_failed trace_id=%s symbol=%s substate=%s",
+                    workflow.id,
+                    workflow.symbol,
+                    workflow.substate,
+                )
+
+    async def _run_node_step(
+        self,
+        *,
+        db: AsyncSession,
+        workflow: AnalysisWorkflow,
+        context: WorkflowContext,
+        node: Any,
+        substate: str,
+        transition_message: str,
+    ) -> dict[str, Any]:
+        await self._runtime.emit(
+            db,
+            workflow,
+            WorkflowState.running,
+            substate,
+            transition_message,
+        )
+        started_at = datetime.now(timezone.utc)
+        await self._emit_progress_isolated(
+            workflow_id=workflow.id,
+            event_type="node_started",
+            substate=substate,
+            message=f"{substate} started",
+            payload={
+                "node": substate,
+                "startedAt": started_at.isoformat(),
+            },
+        )
+        logger.info(
+            "workflow_node_started trace_id=%s symbol=%s node=%s",
+            workflow.id,
+            workflow.symbol,
+            substate,
+        )
+        interval_seconds = max(1, settings.workflow_node_heartbeat_interval_seconds)
+        node_task = asyncio.create_task(node.execute(context))
+        try:
+            while True:
+                try:
+                    output = await asyncio.wait_for(asyncio.shield(node_task), timeout=interval_seconds)
+                    break
+                except TimeoutError as exc:
+                    if node_task.done():
+                        raise exc
+                    elapsed_ms = int((datetime.now(timezone.utc) - started_at).total_seconds() * 1000)
+                    await self._emit_progress_isolated(
+                        workflow_id=workflow.id,
+                        event_type="node_heartbeat",
+                        substate=substate,
+                        message=f"{substate} still running",
+                        payload={"node": substate, "elapsedMs": elapsed_ms},
+                    )
+                    logger.info(
+                        "workflow_node_heartbeat trace_id=%s symbol=%s node=%s elapsed_ms=%s",
+                        workflow.id,
+                        workflow.symbol,
+                        substate,
+                        elapsed_ms,
+                    )
+        except TimeoutError as exc:
+            duration_ms = int((datetime.now(timezone.utc) - started_at).total_seconds() * 1000)
+            await self._emit_progress_isolated(
+                workflow_id=workflow.id,
+                event_type="node_timeout",
+                substate=substate,
+                message=f"{substate} timed out",
+                payload={
+                    "node": substate,
+                    "durationMs": duration_ms,
+                    "errorType": type(exc).__name__,
+                },
+            )
+            logger.warning(
+                "workflow_node_timeout trace_id=%s symbol=%s node=%s duration_ms=%s",
+                workflow.id,
+                workflow.symbol,
+                substate,
+                duration_ms,
+            )
+            raise
+        except Exception as exc:
+            duration_ms = int((datetime.now(timezone.utc) - started_at).total_seconds() * 1000)
+            await self._emit_progress_isolated(
+                workflow_id=workflow.id,
+                event_type="node_failed",
+                substate=substate,
+                message=f"{substate} failed",
+                payload={
+                    "node": substate,
+                    "durationMs": duration_ms,
+                    "errorType": type(exc).__name__,
+                    "error": str(exc)[:300],
+                },
+            )
+            logger.exception(
+                "workflow_node_failed trace_id=%s symbol=%s node=%s duration_ms=%s",
+                workflow.id,
+                workflow.symbol,
+                substate,
+                duration_ms,
+            )
+            raise
+        duration_ms = int((datetime.now(timezone.utc) - started_at).total_seconds() * 1000)
+        await self._emit_progress_isolated(
+            workflow_id=workflow.id,
+            event_type="node_succeeded",
+            substate=substate,
+            message=f"{substate} completed",
+            payload={"node": substate, "durationMs": duration_ms},
+        )
+        logger.info(
+            "workflow_node_succeeded trace_id=%s symbol=%s node=%s duration_ms=%s",
+            workflow.id,
+            workflow.symbol,
+            substate,
+            duration_ms,
+        )
+        return output
+
+    async def _emit_progress_isolated(
+        self,
+        *,
+        workflow_id: str,
+        event_type: str,
+        substate: str | None,
+        message: str,
+        payload: dict[str, Any] | None,
+    ) -> None:
+        from app.db.session import AsyncSessionLocal
+
+        async with AsyncSessionLocal() as isolated_db:
+            result = await isolated_db.execute(
+                select(AnalysisWorkflow).where(AnalysisWorkflow.id == workflow_id)
+            )
+            workflow = result.scalar_one_or_none()
+            if workflow is None:
+                return
+            await self._runtime.emit_progress(
+                isolated_db,
+                workflow,
+                event_type=event_type,
+                substate=substate,
+                message=message,
+                payload=payload,
+            )
+
+    async def _fail_workflow_isolated(self, *, workflow_id: str, error: str) -> None:
+        from app.db.session import AsyncSessionLocal
+
+        async with AsyncSessionLocal() as isolated_db:
+            result = await isolated_db.execute(
+                select(AnalysisWorkflow).where(AnalysisWorkflow.id == workflow_id)
+            )
+            workflow = result.scalar_one_or_none()
+            if workflow is None:
+                return
+            workflow.error_message = error[:500]
+            workflow.error_code = "analysis_failed"
+            await isolated_db.commit()
+            await self._runtime.fail(
+                isolated_db,
+                workflow,
+                substate="failed",
+                message="Analysis failed",
+                error_code="analysis_failed",
+                payload={"error": error},
+            )
 
     async def _run_deep_research(
         self,
@@ -300,14 +484,14 @@ class WorkflowOrchestrator:
                 )
                 return
 
-        await self._runtime.emit(
-            db,
-            workflow,
-            WorkflowState.running,
-            "deep_research",
-            "Running deep research analysis",
+        await self._run_node_step(
+            db=db,
+            workflow=workflow,
+            context=context,
+            node=DeepResearchNode(self._deep_research_client),
+            substate="deep_research",
+            transition_message="Running deep research analysis",
         )
-        await DeepResearchNode(self._deep_research_client).execute(context)
         deep_research_result = context.get("result")
         if isinstance(deep_research_result, dict):
             await self._runtime.persist_artifact(
@@ -378,6 +562,71 @@ class WorkflowOrchestrator:
             "reportMarkdown": details.get("reportMarkdown"),
             "citations": details.get("citations", []),
         }
+
+    async def _monitor_running_workflows(self) -> None:
+        from app.db.session import AsyncSessionLocal
+
+        interval_seconds = max(5, settings.workflow_stall_monitor_interval_seconds)
+        stale_threshold_seconds = max(10, settings.workflow_stale_progress_threshold_seconds)
+        cooldown_seconds = max(30, settings.workflow_stall_signal_cooldown_seconds)
+        while True:
+            try:
+                async with AsyncSessionLocal() as db:
+                    result = await db.execute(
+                        select(AnalysisWorkflow).where(AnalysisWorkflow.state == WorkflowState.running.value)
+                    )
+                    running_workflows = result.scalars().all()
+                    now = datetime.now(timezone.utc)
+                    active_ids = {workflow.id for workflow in running_workflows}
+                    stale_ids = set(self._stall_signaled_at.keys()) - active_ids
+                    for workflow_id in stale_ids:
+                        self._stall_signaled_at.pop(workflow_id, None)
+
+                    for workflow in running_workflows:
+                        event_result = await db.execute(
+                            select(AnalysisWorkflowEvent)
+                            .where(AnalysisWorkflowEvent.workflow_id == workflow.id)
+                            .order_by(desc(AnalysisWorkflowEvent.created_at))
+                            .limit(1)
+                        )
+                        last_event = event_result.scalar_one_or_none()
+                        if last_event is None:
+                            continue
+                        elapsed_seconds = (now - last_event.created_at).total_seconds()
+                        if elapsed_seconds < stale_threshold_seconds:
+                            continue
+                        last_signaled_at = self._stall_signaled_at.get(workflow.id)
+                        if (
+                            last_signaled_at is not None
+                            and (now - last_signaled_at).total_seconds() < cooldown_seconds
+                        ):
+                            continue
+                        await self._runtime.emit_progress(
+                            db,
+                            workflow,
+                            event_type="stalled_no_progress",
+                            substate=workflow.substate,
+                            message="Workflow has no progress beyond stale threshold",
+                            payload={
+                                "node": workflow.substate,
+                                "lastEventAt": last_event.created_at.isoformat(),
+                                "elapsedWithoutProgressSec": int(elapsed_seconds),
+                                "staleThresholdSec": stale_threshold_seconds,
+                            },
+                        )
+                        self._stall_signaled_at[workflow.id] = now
+                        logger.warning(
+                            "workflow_stalled_no_progress trace_id=%s symbol=%s node=%s elapsed_without_progress_sec=%s",
+                            workflow.id,
+                            workflow.symbol,
+                            workflow.substate,
+                            int(elapsed_seconds),
+                        )
+            except asyncio.CancelledError:
+                raise
+            except Exception:
+                logger.exception("workflow_stall_monitor_error")
+            await asyncio.sleep(interval_seconds)
 
 
 __all__ = ["WorkflowOrchestrator"]

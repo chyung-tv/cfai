@@ -59,59 +59,51 @@ class ReverseDcfNode(BaseNode):
             result = {"id": context.get("workflow_id"), "symbol": symbol}
 
         try:
-            (
-                quote_call,
-                profile_call,
-                quarter_income_call,
-                quarter_cash_flow_call,
-                quarter_balance_call,
-            ) = await asyncio.gather(
-                self._fetch_dataset_cached(
-                    context=context,
-                    symbol=symbol,
-                    dataset_type="quote",
-                    period=None,
-                    fetcher=lambda: self._fmp_client.fetch_quote(symbol),
-                ),
-                self._fetch_dataset_cached(
-                    context=context,
-                    symbol=symbol,
-                    dataset_type="profile",
-                    period=None,
-                    fetcher=lambda: self._fmp_client.fetch_profile_by_symbol(symbol),
-                ),
-                self._fetch_dataset_cached(
-                    context=context,
-                    symbol=symbol,
-                    dataset_type="income_statement",
+            quote_call = await self._fetch_dataset_cached(
+                context=context,
+                symbol=symbol,
+                dataset_type="quote",
+                period=None,
+                fetcher=lambda: self._fmp_client.fetch_quote(symbol),
+            )
+            profile_call = await self._fetch_dataset_cached(
+                context=context,
+                symbol=symbol,
+                dataset_type="profile",
+                period=None,
+                fetcher=lambda: self._fmp_client.fetch_profile_by_symbol(symbol),
+            )
+            quarter_income_call = await self._fetch_dataset_cached(
+                context=context,
+                symbol=symbol,
+                dataset_type="income_statement",
+                period="quarter",
+                fetcher=lambda: self._fmp_client.fetch_income_statement(
+                    symbol,
                     period="quarter",
-                    fetcher=lambda: self._fmp_client.fetch_income_statement(
-                        symbol,
-                        period="quarter",
-                        limit=4,
-                    ),
+                    limit=4,
                 ),
-                self._fetch_dataset_cached(
-                    context=context,
-                    symbol=symbol,
-                    dataset_type="cash_flow_statement",
+            )
+            quarter_cash_flow_call = await self._fetch_dataset_cached(
+                context=context,
+                symbol=symbol,
+                dataset_type="cash_flow_statement",
+                period="quarter",
+                fetcher=lambda: self._fmp_client.fetch_cash_flow_statement(
+                    symbol,
                     period="quarter",
-                    fetcher=lambda: self._fmp_client.fetch_cash_flow_statement(
-                        symbol,
-                        period="quarter",
-                        limit=4,
-                    ),
+                    limit=4,
                 ),
-                self._fetch_dataset_cached(
-                    context=context,
-                    symbol=symbol,
-                    dataset_type="balance_sheet_statement",
+            )
+            quarter_balance_call = await self._fetch_dataset_cached(
+                context=context,
+                symbol=symbol,
+                dataset_type="balance_sheet_statement",
+                period="quarter",
+                fetcher=lambda: self._fmp_client.fetch_balance_sheet_statement(
+                    symbol,
                     period="quarter",
-                    fetcher=lambda: self._fmp_client.fetch_balance_sheet_statement(
-                        symbol,
-                        period="quarter",
-                        limit=1,
-                    ),
+                    limit=1,
                 ),
             )
         except FmpClientError as exc:
@@ -122,28 +114,26 @@ class ReverseDcfNode(BaseNode):
         annual_balance_call: list[dict[str, Any]] = []
         if len(quarter_income_call) < 4 or len(quarter_cash_flow_call) < 4 or len(quarter_balance_call) < 1:
             try:
-                annual_income_call, annual_cash_flow_call, annual_balance_call = await asyncio.gather(
-                    self._fetch_dataset_cached(
-                        context=context,
-                        symbol=symbol,
-                        dataset_type="income_statement",
-                        period="annual",
-                        fetcher=lambda: self._fmp_client.fetch_income_statement(symbol, limit=1),
-                    ),
-                    self._fetch_dataset_cached(
-                        context=context,
-                        symbol=symbol,
-                        dataset_type="cash_flow_statement",
-                        period="annual",
-                        fetcher=lambda: self._fmp_client.fetch_cash_flow_statement(symbol, limit=1),
-                    ),
-                    self._fetch_dataset_cached(
-                        context=context,
-                        symbol=symbol,
-                        dataset_type="balance_sheet_statement",
-                        period="annual",
-                        fetcher=lambda: self._fmp_client.fetch_balance_sheet_statement(symbol, limit=1),
-                    ),
+                annual_income_call = await self._fetch_dataset_cached(
+                    context=context,
+                    symbol=symbol,
+                    dataset_type="income_statement",
+                    period="annual",
+                    fetcher=lambda: self._fmp_client.fetch_income_statement(symbol, limit=1),
+                )
+                annual_cash_flow_call = await self._fetch_dataset_cached(
+                    context=context,
+                    symbol=symbol,
+                    dataset_type="cash_flow_statement",
+                    period="annual",
+                    fetcher=lambda: self._fmp_client.fetch_cash_flow_statement(symbol, limit=1),
+                )
+                annual_balance_call = await self._fetch_dataset_cached(
+                    context=context,
+                    symbol=symbol,
+                    dataset_type="balance_sheet_statement",
+                    period="annual",
+                    fetcher=lambda: self._fmp_client.fetch_balance_sheet_statement(symbol, limit=1),
                 )
             except FmpClientError as exc:
                 raise RuntimeError(f"reverse_dcf_fmp_{exc.code}: {exc}") from exc

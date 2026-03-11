@@ -16,9 +16,8 @@ from app.models.workflow.catalog_seed_run import CatalogSeedRun
 from app.models.workflow.stock_catalog import StockCatalog
 from app.providers.fmp_client import FmpClient, FmpClientError
 
-TARGET_CATALOG_SIZE = 500
-PROFILE_COVERAGE_THRESHOLD = 0.90
-DEFAULT_PROFILE_CONCURRENCY = 10
+DEFAULT_SEED_TARGET_COUNT = 100
+DEFAULT_MIN_MARKET_CAP = 10_000_000_000
 STALE_RUN_TIMEOUT_SECONDS = 60 * 15
 
 
@@ -35,14 +34,16 @@ class CatalogSeedService(BaseWorkflowRunner):
         *,
         fmp_client: FmpClient,
         session_factory: async_sessionmaker[AsyncSession],
-        profile_concurrency: int = DEFAULT_PROFILE_CONCURRENCY,
+        target_catalog_size: int = DEFAULT_SEED_TARGET_COUNT,
+        min_market_cap: int = DEFAULT_MIN_MARKET_CAP,
     ) -> None:
         self._fmp = fmp_client
         self._session_factory = session_factory
-        self._profile_concurrency = profile_concurrency
+        self._target_catalog_size = max(1, target_catalog_size)
+        self._min_market_cap = max(0, min_market_cap)
         self._tasks: set[asyncio.Task[None]] = set()
 
-    async def start_top500_us_seed(self) -> str:
+    async def start_top_us_market_cap_seed(self) -> str:
         async with self._session_factory() as db:
             await self._recover_stale_runs(db)
             existing_running = await db.execute(
@@ -59,7 +60,7 @@ class CatalogSeedService(BaseWorkflowRunner):
             db.add(
                 CatalogSeedRun(
                     id=run_id,
-                    scope="top500_us_market_cap",
+                    scope="top_us_market_cap",
                     status="running",
                     endpoint_strategy="hybrid_best_available",
                     request_params={
@@ -67,9 +68,10 @@ class CatalogSeedService(BaseWorkflowRunner):
                         "isActivelyTrading": True,
                         "isEtf": False,
                         "isFund": False,
+                        "marketCapMoreThan": self._min_market_cap,
                         "limit": 5000,
                     },
-                    expected_count=TARGET_CATALOG_SIZE,
+                    expected_count=self._target_catalog_size,
                     worker_id="seed-service-local",
                     heartbeat_at=datetime.now(UTC),
                 )
@@ -121,31 +123,24 @@ class CatalogSeedService(BaseWorkflowRunner):
                 is_actively_trading=True,
                 is_etf=False,
                 is_fund=False,
+                market_cap_more_than=self._min_market_cap,
                 limit=5000,
             )
-            selected = self._select_top500(
+            selected, screener_by_symbol = self._select_top_by_market_cap(
                 directory_rows=directory_result.data,
                 screener_rows=screener_result.data,
             )
-            if len(selected) != TARGET_CATALOG_SIZE:
+            if len(selected) != self._target_catalog_size:
                 raise FmpClientError(
                     "insufficient_universe",
-                    f"selected {len(selected)} symbols, expected {TARGET_CATALOG_SIZE}",
+                    f"selected {len(selected)} symbols, expected {self._target_catalog_size}",
                 )
 
-            profiles, profile_endpoint = await self._fetch_profiles(selected)
             await self._heartbeat(run_id)
-            profile_coverage = len(profiles) / TARGET_CATALOG_SIZE
-            if profile_coverage < PROFILE_COVERAGE_THRESHOLD:
-                raise FmpClientError(
-                    "profile_coverage_below_threshold",
-                    f"profile coverage {profile_coverage:.2f} below {PROFILE_COVERAGE_THRESHOLD:.2f}",
-                )
-
             inserted_count, updated_count = await self._upsert_catalog(
                 run_id=run_id,
                 selected=selected,
-                profiles_by_symbol=profiles,
+                screener_by_symbol=screener_by_symbol,
             )
             await self._heartbeat(run_id)
             await self._mark_run_succeeded(
@@ -153,11 +148,10 @@ class CatalogSeedService(BaseWorkflowRunner):
                 selected_count=len(selected),
                 inserted_count=inserted_count,
                 updated_count=updated_count,
-                profile_coverage=profile_coverage,
+                profile_coverage=1.0,
                 endpoint_usage={
                     "directory": directory_result.endpoint,
                     "screener": screener_result.endpoint,
-                    "profile": profile_endpoint,
                 },
             )
         except FmpClientError as exc:
@@ -165,19 +159,20 @@ class CatalogSeedService(BaseWorkflowRunner):
         except Exception as exc:  # pragma: no cover - safety net for background task
             await self._mark_run_failed(run_id=run_id, error_code="unhandled_error", error_message=str(exc))
 
-    def _select_top500(
+    def _select_top_by_market_cap(
         self,
         *,
         directory_rows: list[dict[str, Any]],
         screener_rows: list[dict[str, Any]],
-    ) -> list[SelectedSymbol]:
+    ) -> tuple[list[SelectedSymbol], dict[str, dict[str, Any]]]:
         directory_symbols = {
             self._normalize_symbol(row.get("symbol")): row
             for row in directory_rows
             if self._is_directory_candidate(row)
         }
 
-        screened_candidates: list[tuple[str, int]] = []
+        dedup_market_cap: dict[str, int] = {}
+        screener_by_symbol: dict[str, dict[str, Any]] = {}
         for row in screener_rows:
             symbol = self._normalize_symbol(row.get("symbol"))
             if not symbol or symbol not in directory_symbols:
@@ -185,17 +180,16 @@ class CatalogSeedService(BaseWorkflowRunner):
             market_cap = self._as_positive_int(row.get("marketCap"))
             if market_cap is None:
                 continue
-            screened_candidates.append((symbol, market_cap))
-
-        dedup: dict[str, int] = {}
-        for symbol, market_cap in screened_candidates:
-            current = dedup.get(symbol, 0)
+            if market_cap < self._min_market_cap:
+                continue
+            current = dedup_market_cap.get(symbol, 0)
             if market_cap > current:
-                dedup[symbol] = market_cap
+                dedup_market_cap[symbol] = market_cap
+                screener_by_symbol[symbol] = row
 
-        ordered = sorted(dedup.items(), key=lambda item: (-item[1], item[0]))
-        top = ordered[:TARGET_CATALOG_SIZE]
-        return [
+        ordered = sorted(dedup_market_cap.items(), key=lambda item: (-item[1], item[0]))
+        top = ordered[: self._target_catalog_size]
+        selected = [
             SelectedSymbol(
                 symbol=symbol,
                 market_cap=market_cap,
@@ -203,39 +197,18 @@ class CatalogSeedService(BaseWorkflowRunner):
             )
             for index, (symbol, market_cap) in enumerate(top)
         ]
-
-    async def _fetch_profiles(
-        self,
-        selected: list[SelectedSymbol],
-    ) -> tuple[dict[str, dict[str, Any]], str]:
-        semaphore = asyncio.Semaphore(self._profile_concurrency)
-        profiles: dict[str, dict[str, Any]] = {}
-        endpoint_usage: dict[str, int] = {}
-
-        async def _pull(item: SelectedSymbol) -> None:
-            async with semaphore:
-                try:
-                    result = await self._fmp.fetch_profile_by_symbol(item.symbol)
-                except FmpClientError:
-                    return
-                endpoint_usage[result.endpoint] = endpoint_usage.get(result.endpoint, 0) + 1
-                if not result.data:
-                    return
-                profile = result.data[0]
-                if not isinstance(profile, dict):
-                    return
-                profiles[item.symbol] = profile
-
-        await asyncio.gather(*[_pull(item) for item in selected])
-        endpoint = max(endpoint_usage, key=endpoint_usage.get) if endpoint_usage else "unknown"
-        return profiles, endpoint
+        selected_symbols = {item.symbol for item in selected}
+        selected_screener_rows = {
+            symbol: row for symbol, row in screener_by_symbol.items() if symbol in selected_symbols
+        }
+        return selected, selected_screener_rows
 
     async def _upsert_catalog(
         self,
         *,
         run_id: str,
         selected: list[SelectedSymbol],
-        profiles_by_symbol: dict[str, dict[str, Any]],
+        screener_by_symbol: dict[str, dict[str, Any]],
     ) -> tuple[int, int]:
         async with self._session_factory() as db:
             symbols = [item.symbol for item in selected]
@@ -248,25 +221,23 @@ class CatalogSeedService(BaseWorkflowRunner):
 
             rows_to_upsert: list[dict[str, Any]] = []
             for item in selected:
-                profile = profiles_by_symbol.get(item.symbol, {})
+                screener = screener_by_symbol.get(item.symbol, {})
                 name_display = (
-                    self._pick_text(profile, ("companyName", "name")) or item.symbol
+                    self._pick_text(screener, ("companyName", "name")) or item.symbol
                 )
                 values = {
                     "symbol": item.symbol,
                     "name_display": name_display,
                     "name_normalized": self._normalize_name(name_display),
-                    "exchange": self._pick_text(profile, ("exchange", "exchangeShortName")),
+                    "exchange": self._pick_text(screener, ("exchange", "exchangeShortName")),
                     "exchange_short_name": self._pick_text(
-                        profile, ("exchangeShortName", "exchange")
+                        screener, ("exchangeShortName", "exchange")
                     ),
-                    "country": self._pick_text(profile, ("country",)),
-                    "sector": self._pick_text(profile, ("sector",)),
-                    "industry": self._pick_text(profile, ("industry",)),
-                    "market_cap": self._as_positive_int(profile.get("mktCap"))
-                    or self._as_positive_int(profile.get("marketCap"))
-                    or item.market_cap,
-                    "is_active": self._as_bool(profile.get("isActivelyTrading"), default=True),
+                    "country": self._pick_text(screener, ("country",)),
+                    "sector": self._pick_text(screener, ("sector",)),
+                    "industry": self._pick_text(screener, ("industry",)),
+                    "market_cap": self._as_positive_int(screener.get("marketCap")) or item.market_cap,
+                    "is_active": self._as_bool(screener.get("isActivelyTrading"), default=True),
                     "selection_rank": item.selection_rank,
                     "selection_method": "market_cap_desc_symbol_asc",
                     "source": "fmp",

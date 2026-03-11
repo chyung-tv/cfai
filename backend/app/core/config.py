@@ -58,7 +58,24 @@ class Settings:
     fmp_api_key: str = os.getenv("FMP_API_KEY", "")
     fmp_base_url: str = os.getenv("FMP_BASE_URL", "https://financialmodelingprep.com")
     fmp_timeout_seconds: int = _as_int("FMP_TIMEOUT_SECONDS", 30)
-    google_api_key: str = os.getenv("GOOGLE_API_KEY", "")
+    maintenance_seed_target_count: int = _as_int("MAINTENANCE_SEED_TARGET_COUNT", 100)
+    maintenance_seed_min_market_cap: int = _as_int("MAINTENANCE_SEED_MIN_MARKET_CAP", 10000000000)
+    workflow_node_heartbeat_interval_seconds: int = _as_int(
+        "WORKFLOW_NODE_HEARTBEAT_INTERVAL_SECONDS", 15
+    )
+    workflow_stale_progress_threshold_seconds: int = _as_int(
+        "WORKFLOW_STALE_PROGRESS_THRESHOLD_SECONDS", 120
+    )
+    workflow_stall_monitor_interval_seconds: int = _as_int(
+        "WORKFLOW_STALL_MONITOR_INTERVAL_SECONDS", 30
+    )
+    workflow_stall_signal_cooldown_seconds: int = _as_int(
+        "WORKFLOW_STALL_SIGNAL_COOLDOWN_SECONDS", 300
+    )
+    vertex_ai_project_id: str = os.getenv("VERTEX_AI_PROJECT_ID", os.getenv("GOOGLE_CLOUD_PROJECT", ""))
+    vertex_ai_api_key: str = os.getenv("VERTEX_AI_API_KEY", os.getenv("GOOGLE_API_KEY", ""))
+    vertex_ai_location: str = os.getenv("VERTEX_AI_LOCATION", os.getenv("GOOGLE_CLOUD_LOCATION", "global"))
+    google_genai_use_vertexai: bool = _as_bool("GOOGLE_GENAI_USE_VERTEXAI", True)
     deep_research_agent: str = os.getenv(
         "DEEP_RESEARCH_AGENT",
         "deep-research-pro-preview-12-2025",

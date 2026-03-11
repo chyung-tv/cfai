@@ -13,6 +13,29 @@ from app.workflows.analysis.projections.normalizer import (
     normalize_projection_payload,
 )
 
+DEFAULT_QUALITY_SCORE = 0.5
+DEFAULT_VALUATION_SCORE = 0.5
+DEFAULT_RECENT_CHANGE_SCORE = 0.5
+DEFAULT_PORTFOLIO_IMPACT_SCORE = 0.5
+
+VALUATION_SIGNAL_SCORES: dict[str, float] = {
+    "legitimate": 1.0,
+    "stretch": 0.55,
+    "unlikely": 0.2,
+}
+
+RECENT_CHANGE_SIGNAL_SCORES: dict[str, float] = {
+    "has_new_action": 0.65,
+    "stable": 0.5,
+}
+
+PORTFOLIO_IMPACT_SIGNAL_SCORES: dict[str, float] = {
+    "supportive_growth_assumption": 0.95,
+    "moderate_risk_growth_assumption": 0.55,
+    "high_risk_growth_assumption": 0.2,
+    "unknown": 0.5,
+}
+
 
 async def upsert_workflow_projection(
     db: AsyncSession,
@@ -120,3 +143,30 @@ def _portfolio_impact_signal(payload: dict[str, Any]) -> str | None:
     if value >= 12:
         return "moderate_risk_growth_assumption"
     return "supportive_growth_assumption"
+
+
+def quality_score_value(value: float | None) -> float:
+    if value is None:
+        return DEFAULT_QUALITY_SCORE
+    return max(0.0, min(1.0, float(value)))
+
+
+def valuation_signal_score(signal: str | None) -> float:
+    if not isinstance(signal, str):
+        return DEFAULT_VALUATION_SCORE
+    return VALUATION_SIGNAL_SCORES.get(signal.strip().lower(), DEFAULT_VALUATION_SCORE)
+
+
+def recent_change_signal_score(signal: str | None) -> float:
+    if not isinstance(signal, str):
+        return DEFAULT_RECENT_CHANGE_SCORE
+    return RECENT_CHANGE_SIGNAL_SCORES.get(signal.strip().lower(), DEFAULT_RECENT_CHANGE_SCORE)
+
+
+def portfolio_impact_signal_score(signal: str | None) -> float:
+    if not isinstance(signal, str):
+        return DEFAULT_PORTFOLIO_IMPACT_SCORE
+    return PORTFOLIO_IMPACT_SIGNAL_SCORES.get(
+        signal.strip().lower(),
+        DEFAULT_PORTFOLIO_IMPACT_SCORE,
+    )

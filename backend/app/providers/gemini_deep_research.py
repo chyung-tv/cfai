@@ -42,7 +42,10 @@ class GeminiDeepResearchClient:
     def __init__(
         self,
         *,
-        api_key: str,
+        vertex_api_key: str,
+        vertex_project_id: str,
+        vertex_location: str,
+        use_vertex_ai: bool,
         app_env: str,
         agent: str,
         deep_research_dev_model: str,
@@ -53,7 +56,10 @@ class GeminiDeepResearchClient:
         max_wait_seconds: int,
         enable_live_calls: bool,
     ) -> None:
-        self._api_key = api_key
+        self._vertex_api_key = vertex_api_key
+        self._vertex_project_id = vertex_project_id
+        self._vertex_location = vertex_location
+        self._use_vertex_ai = use_vertex_ai
         self._app_env = app_env
         self._agent = agent
         self._deep_research_dev_model = deep_research_dev_model
@@ -90,11 +96,7 @@ class GeminiDeepResearchClient:
                 },
             )
 
-        if not self._api_key:
-            raise DeepResearchProviderError(
-                "missing_api_key",
-                "GOOGLE_API_KEY is not configured",
-            )
+        self._ensure_provider_credentials()
 
         if not self._use_deep_research_endpoint():
             response = await asyncio.to_thread(
@@ -162,8 +164,7 @@ class GeminiDeepResearchClient:
                 "live_calls_disabled",
                 "structured output normalization requires DEEP_RESEARCH_ENABLE_LIVE_CALLS=true",
             )
-        if not self._api_key:
-            raise DeepResearchProviderError("missing_api_key", "GOOGLE_API_KEY is not configured")
+        self._ensure_provider_credentials()
 
         parsed = await self.generate_json_object(prompt=normalized_prompt)
 
@@ -184,8 +185,7 @@ class GeminiDeepResearchClient:
                 "live_calls_disabled",
                 "json generation requires DEEP_RESEARCH_ENABLE_LIVE_CALLS=true",
             )
-        if not self._api_key:
-            raise DeepResearchProviderError("missing_api_key", "GOOGLE_API_KEY is not configured")
+        self._ensure_provider_credentials()
 
         response = await asyncio.to_thread(self._generate_structured_content, normalized_prompt)
         raw_text = self._extract_response_text(response)
@@ -224,10 +224,38 @@ class GeminiDeepResearchClient:
 
     def _get_client(self) -> genai.Client:
         if self._client is None:
-            self._client = genai.Client(api_key=self._api_key)
+            if self._use_vertex_ai:
+                if self._vertex_api_key:
+                    # Vertex Express Mode: API key auth does not accept project/location.
+                    self._client = genai.Client(vertexai=True, api_key=self._vertex_api_key)
+                else:
+                    self._client = genai.Client(
+                        vertexai=True,
+                        project=self._vertex_project_id,
+                        location=self._vertex_location,
+                    )
+            else:
+                self._client = genai.Client(api_key=self._vertex_api_key)
         return self._client
 
+    def _ensure_provider_credentials(self) -> None:
+        if self._use_vertex_ai:
+            if self._vertex_api_key:
+                return
+            if self._vertex_project_id:
+                return
+            raise DeepResearchProviderError(
+                "missing_vertex_credentials",
+                "Set VERTEX_AI_API_KEY (Express Mode) or VERTEX_AI_PROJECT_ID with ADC",
+            )
+
+        if not self._vertex_api_key:
+            raise DeepResearchProviderError("missing_api_key", "VERTEX_AI_API_KEY is not configured")
+
     def _use_deep_research_endpoint(self) -> bool:
+        if self._use_vertex_ai and self._vertex_api_key:
+            # Vertex Express Mode uses API-key auth and currently runs via models.generate_content path.
+            return False
         env = self._app_env.strip().lower()
         is_prod = env in {"production", "prod"}
         return is_prod and self._deep_research_use_endpoint_in_production

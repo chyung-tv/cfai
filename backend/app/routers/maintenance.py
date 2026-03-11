@@ -10,10 +10,13 @@ from app.workflows.maintenance.seed_service import CatalogSeedService
 def create_maintenance_router(seed_service: CatalogSeedService) -> APIRouter:
     router = APIRouter(prefix="/api/v1/admin/maintenance", tags=["maintenance"])
 
-    @router.post("/catalog/seed/top500-us")
-    async def trigger_top500_seed() -> dict[str, str]:
-        run_id = await seed_service.start_top500_us_seed()
+    async def _trigger_seed() -> dict[str, str]:
+        run_id = await seed_service.start_top_us_market_cap_seed()
         return {"status": "processing", "runId": run_id}
+
+    @router.post("/catalog/seed/top-us-market-cap")
+    async def trigger_top_us_market_cap_seed() -> dict[str, str]:
+        return await _trigger_seed()
 
     @router.get("/catalog/seed-runs/{run_id}")
     async def get_seed_run(

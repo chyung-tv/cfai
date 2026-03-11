@@ -137,6 +137,16 @@ Purpose: compact ADR index with only active decision signal.
   - `DATABASE_URL_DIRECT` is preferred for Alembic migrations.
   - Remove `docker-compose.yml` and Dockerfiles from active setup.
 
+### ADR-0019 - Backend-first workflow observability with persisted node timeline and stalled diagnostics
+- Date: 2026-03-10
+- Status: `accepted`
+- Why: debugging stuck traces (especially around `reverse_dcf`) required deterministic visibility in DB/API/logs instead of relying on frontend stream state.
+- Impact:
+  - Persist node-level progress events (`node_started`, `node_heartbeat`, `node_succeeded`, `node_failed`, `node_timeout`) in `analysis_workflow_events`.
+  - Add operator-focused endpoints for trace status/timeline (`/analysis/workflows/{trace_id}/status`, `/analysis/workflows/{trace_id}/timeline`).
+  - Add backend stalled-no-progress monitor with env-configurable thresholds/cooldown and structured correlation logs.
+  - Keep implementation backend-first; frontend observability changes remain optional and deferred.
+
 ## Open Decision Candidates
 
 - Auth/rbac/quota reintroduction plan and sequencing after core milestone completion.

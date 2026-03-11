@@ -1,6 +1,6 @@
 # CFAI Roadmap
 
-Last validated: 2026-03-10 (Neon migration + split frontend/backend envs)
+Last validated: 2026-03-10 (maintenance seed + workflow observability stabilization complete)
 Purpose: single source of execution status and next actions.
 
 ## Session Briefing (mandatory order)
@@ -9,9 +9,9 @@ Purpose: single source of execution status and next actions.
 2. What we need to implement next
 3. What we just implemented
 
-- Where we are at: portfolio-home is implemented as the primary route with drag/add, weight edit/remove, seeded candidates, freshness/no-cache cues, and local persistence; infra baseline now targets Neon without Docker orchestration.
-- What we need to implement next: execute Stage P2 (portfolio metrics and candidate ranking/filtering for faster 1-2 minute decisions) on top of the new Neon/terminal-native dev setup.
-- What we just implemented: Neon DB migration baseline (`DATABASE_URL` pooled + `DATABASE_URL_DIRECT` for migrations), Docker artifact removal, and env split (`frontend/.env.local`, `backend/.env`) with updated docs.
+- Where we are at: portfolio-home is implemented as the primary route with drag/add, weight edit/remove, seeded candidates, freshness/no-cache cues, and local persistence; infra baseline now targets Neon without Docker orchestration; maintenance seed and workflow observability reliability unblocks are completed.
+- What we need to implement next: execute Stage P2 (portfolio metrics and candidate ranking/filtering for faster 1-2 minute decisions), starting with backend read aggregation contract for `portfolioRiskScore` / `expectedReturnRange` / `sectorConcentrationWarning`.
+- What we just implemented: Neon DB migration baseline (`DATABASE_URL` pooled + `DATABASE_URL_DIRECT` for migrations), Docker artifact removal, env split (`frontend/.env.local`, `backend/.env`), maintenance seed simplification to screener-only enrichment with env-configurable Top-N + market-cap threshold plus idempotent naming (`top_us_market_cap`), and backend workflow observability upgrades (node-level timeline events, status/timeline APIs, heartbeat + stalled-no-progress monitor, structured server logs), including SQLAlchemy async session-concurrency fixes in orchestrator/reverse DCF paths.
 
 ## Module Status
 
@@ -35,7 +35,7 @@ Purpose: single source of execution status and next actions.
 
 - Active slice: Stage P2 portfolio metrics and candidate ranking/filtering (with Neon-backed terminal-native environment).
 - Owners: user + coding agent.
-- Blockers: see `./debuglog.md`.
+- Blockers: none active for seed/observability; see `./debuglog.md` only for newly reproducible issues.
 
 ## Detailed Implementation Queue
 

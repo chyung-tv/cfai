@@ -21,6 +21,67 @@ type CandidateMeta = {
   isFresh: boolean | null;
 };
 
+type CandidateCard = {
+  symbol: string;
+  name: string | null;
+  sector: string | null;
+  freshnessUpdatedAt: string | null;
+  freshnessExpiresAt: string | null;
+  isFresh: boolean | null;
+  qualityScore: number | null;
+  valuationSignal: string | null;
+  recentChangeSignal: string | null;
+  portfolioImpactSignal: string | null;
+  expectedReturnRange: {
+    lowPct: number;
+    highPct: number;
+  } | null;
+  scores: {
+    quality: number;
+    valuation: number;
+    recentChange: number;
+    valuationRecent: number;
+    portfolioImpact: number;
+    blended: number;
+    portfolioRisk: number;
+  } | null;
+  status: CandidateMeta["status"];
+};
+
+type CandidateCardsResponse = {
+  cards?: Array<{
+    symbol?: string;
+    name?: string | null;
+    sector?: string | null;
+    freshnessUpdatedAt?: string | null;
+    freshnessExpiresAt?: string | null;
+    isFresh?: boolean | null;
+    qualityScore?: number | null;
+    valuationSignal?: string | null;
+    recentChangeSignal?: string | null;
+    portfolioImpactSignal?: string | null;
+    expectedReturnRange?: {
+      lowPct?: number;
+      highPct?: number;
+    } | null;
+    scores?: {
+      quality?: number;
+      valuation?: number;
+      recentChange?: number;
+      valuationRecent?: number;
+      portfolioImpact?: number;
+      blended?: number;
+      portfolioRisk?: number;
+    } | null;
+  }>;
+};
+
+type PortfolioMetrics = {
+  portfolioRiskScore: number;
+  expectedReturnRange: { lowPct: number; highPct: number };
+  sectorConcentrationWarning: string | null;
+};
+
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL ?? "http://localhost:3001";
 const STORAGE_KEY = "cfai.portfolio.v1";
 const STORAGE_VERSION = 1;
@@ -83,16 +144,6 @@ function formatWeight(value: number): string {
   return Number.isFinite(value) ? value.toFixed(1) : "0.0";
 }
 
-function readFreshness(payload: unknown): boolean | null {
-  if (!payload || typeof payload !== "object") return null;
-  const summary = (payload as { summary?: unknown }).summary;
-  if (!summary || typeof summary !== "object") return null;
-  const analysisFreshness = (summary as { analysisFreshness?: unknown }).analysisFreshness;
-  if (!analysisFreshness || typeof analysisFreshness !== "object") return null;
-  const isFresh = (analysisFreshness as { isFresh?: unknown }).isFresh;
-  return typeof isFresh === "boolean" ? isFresh : null;
-}
-
 function freshnessBadge(meta: CandidateMeta): { label: string; variant: "default" | "secondary" | "outline" | "destructive" } {
   if (meta.status === "loading") return { label: "Checking cache...", variant: "outline" };
   if (meta.status === "error") return { label: "Lookup failed", variant: "destructive" };
@@ -100,6 +151,66 @@ function freshnessBadge(meta: CandidateMeta): { label: string; variant: "default
   if (meta.isFresh === true) return { label: "Fresh (<=7d)", variant: "default" };
   if (meta.isFresh === false) return { label: "Stale (>7d)", variant: "secondary" };
   return { label: "Freshness unknown", variant: "outline" };
+}
+
+function toCandidateCard(input: CandidateCardsResponse["cards"][number]): CandidateCard | null {
+  if (!input || typeof input.symbol !== "string" || !input.symbol.trim()) return null;
+  const range = input.expectedReturnRange;
+  const scores = input.scores;
+  return {
+    symbol: input.symbol.trim().toUpperCase(),
+    name: typeof input.name === "string" ? input.name : null,
+    sector: typeof input.sector === "string" ? input.sector : null,
+    freshnessUpdatedAt: typeof input.freshnessUpdatedAt === "string" ? input.freshnessUpdatedAt : null,
+    freshnessExpiresAt: typeof input.freshnessExpiresAt === "string" ? input.freshnessExpiresAt : null,
+    isFresh: typeof input.isFresh === "boolean" ? input.isFresh : null,
+    qualityScore: typeof input.qualityScore === "number" ? input.qualityScore : null,
+    valuationSignal: typeof input.valuationSignal === "string" ? input.valuationSignal : null,
+    recentChangeSignal: typeof input.recentChangeSignal === "string" ? input.recentChangeSignal : null,
+    portfolioImpactSignal: typeof input.portfolioImpactSignal === "string" ? input.portfolioImpactSignal : null,
+    expectedReturnRange:
+      range && typeof range.lowPct === "number" && typeof range.highPct === "number"
+        ? { lowPct: range.lowPct, highPct: range.highPct }
+        : null,
+    scores:
+      scores &&
+      typeof scores.quality === "number" &&
+      typeof scores.valuation === "number" &&
+      typeof scores.recentChange === "number" &&
+      typeof scores.valuationRecent === "number" &&
+      typeof scores.portfolioImpact === "number" &&
+      typeof scores.blended === "number" &&
+      typeof scores.portfolioRisk === "number"
+        ? {
+            quality: scores.quality,
+            valuation: scores.valuation,
+            recentChange: scores.recentChange,
+            valuationRecent: scores.valuationRecent,
+            portfolioImpact: scores.portfolioImpact,
+            blended: scores.blended,
+            portfolioRisk: scores.portfolioRisk,
+          }
+        : null,
+    status: "ready",
+  };
+}
+
+function fallbackCandidates(): CandidateCard[] {
+  return SEEDED_CANDIDATES.map((candidate) => ({
+    symbol: candidate.symbol,
+    name: candidate.name,
+    sector: null,
+    freshnessUpdatedAt: null,
+    freshnessExpiresAt: null,
+    isFresh: null,
+    qualityScore: null,
+    valuationSignal: null,
+    recentChangeSignal: null,
+    portfolioImpactSignal: null,
+    expectedReturnRange: null,
+    scores: null,
+    status: "loading",
+  }));
 }
 
 function getInitialPositions(): Position[] {
@@ -120,16 +231,72 @@ function getInitialPositions(): Position[] {
 export default function PortfolioPage() {
   const [positions, setPositions] = useState<Position[]>(() => getInitialPositions());
   const [draggingOverPortfolio, setDraggingOverPortfolio] = useState(false);
-  const [candidateMeta, setCandidateMeta] = useState<Record<string, CandidateMeta>>(
-    Object.fromEntries(
-      SEEDED_CANDIDATES.map((item) => [item.symbol, { status: "loading", isFresh: null } satisfies CandidateMeta]),
-    ),
-  );
+  const [candidates, setCandidates] = useState<CandidateCard[]>(() => fallbackCandidates());
+  const [candidateSearch, setCandidateSearch] = useState("");
+  const [freshnessFilter, setFreshnessFilter] = useState<"all" | "fresh" | "stale">("all");
 
   const totalWeight = useMemo(
     () => positions.reduce((acc, position) => acc + (Number.isFinite(position.weight) ? position.weight : 0), 0),
     [positions],
   );
+  const candidateBySymbol = useMemo(
+    () => new Map(candidates.map((candidate) => [candidate.symbol, candidate])),
+    [candidates],
+  );
+  const portfolioMetrics = useMemo<PortfolioMetrics>(() => {
+    if (positions.length === 0 || totalWeight <= 0) {
+      return {
+        portfolioRiskScore: 50,
+        expectedReturnRange: { lowPct: 0, highPct: 0 },
+        sectorConcentrationWarning: null,
+      };
+    }
+    let weightedRisk = 0;
+    let weightedLow = 0;
+    let weightedHigh = 0;
+    const sectorWeights = new Map<string, number>();
+    for (const position of positions) {
+      const normalizedWeight = Math.max(0, position.weight) / totalWeight;
+      const candidate = candidateBySymbol.get(position.symbol);
+      const risk = candidate?.scores?.portfolioRisk ?? 0.5;
+      const low = candidate?.expectedReturnRange?.lowPct ?? -1;
+      const high = candidate?.expectedReturnRange?.highPct ?? 7;
+      weightedRisk += normalizedWeight * risk;
+      weightedLow += normalizedWeight * low;
+      weightedHigh += normalizedWeight * high;
+      const sector = candidate?.sector?.trim() || "Unknown";
+      sectorWeights.set(sector, (sectorWeights.get(sector) ?? 0) + normalizedWeight);
+    }
+    let sectorConcentrationWarning: string | null = null;
+    let topSector = "Unknown";
+    let topWeight = 0;
+    for (const [sector, weight] of sectorWeights.entries()) {
+      if (weight > topWeight) {
+        topSector = sector;
+        topWeight = weight;
+      }
+    }
+    if (topWeight >= 0.4) {
+      sectorConcentrationWarning = `${topSector} concentration is high (${Math.round(topWeight * 100)}%).`;
+    }
+    return {
+      portfolioRiskScore: Math.round(weightedRisk * 100),
+      expectedReturnRange: {
+        lowPct: Number(weightedLow.toFixed(1)),
+        highPct: Number(weightedHigh.toFixed(1)),
+      },
+      sectorConcentrationWarning,
+    };
+  }, [candidateBySymbol, positions, totalWeight]);
+  const displayedCandidates = useMemo(() => {
+    const query = candidateSearch.trim().toUpperCase();
+    return candidates.filter((candidate) => {
+      if (freshnessFilter === "fresh" && candidate.isFresh !== true) return false;
+      if (freshnessFilter === "stale" && candidate.isFresh !== false) return false;
+      if (!query) return true;
+      return candidate.symbol.includes(query) || (candidate.name ?? "").toUpperCase().includes(query);
+    });
+  }, [candidateSearch, candidates, freshnessFilter]);
 
   function upsertPosition(symbol: string): void {
     setPositions((current) => {
@@ -160,43 +327,28 @@ export default function PortfolioPage() {
   useEffect(() => {
     let cancelled = false;
     async function hydrateCandidates(): Promise<void> {
-      await Promise.all(
-        SEEDED_CANDIDATES.map(async (candidate) => {
-          try {
-            const response = await fetch(
-              `${BACKEND_URL}/analysis/latest?symbol=${encodeURIComponent(candidate.symbol)}`,
-              { credentials: "include" },
-            );
-            if (cancelled) return;
-            if (!response.ok) {
-              setCandidateMeta((current) => ({
-                ...current,
-                [candidate.symbol]: { status: "error", isFresh: null },
-              }));
-              return;
-            }
-            const data = (await response.json()) as unknown;
-            if (cancelled) return;
-            if (!data) {
-              setCandidateMeta((current) => ({
-                ...current,
-                [candidate.symbol]: { status: "missing", isFresh: null },
-              }));
-              return;
-            }
-            setCandidateMeta((current) => ({
-              ...current,
-              [candidate.symbol]: { status: "ready", isFresh: readFreshness(data) },
-            }));
-          } catch {
-            if (cancelled) return;
-            setCandidateMeta((current) => ({
-              ...current,
-              [candidate.symbol]: { status: "error", isFresh: null },
-            }));
-          }
-        }),
-      );
+      try {
+        const response = await fetch(
+          `${BACKEND_URL}/analysis/candidates?sort_by=blended&quality_weight=0.4&portfolio_impact_weight=0.3&valuation_recent_weight=0.3&limit=120`,
+          { credentials: "include" },
+        );
+        if (cancelled) return;
+        if (!response.ok) {
+          setCandidates(fallbackCandidates().map((item) => ({ ...item, status: "error" })));
+          return;
+        }
+        const payload = (await response.json()) as CandidateCardsResponse;
+        if (cancelled) return;
+        const parsedCards = (payload.cards ?? []).map(toCandidateCard).filter((item): item is CandidateCard => item !== null);
+        if (parsedCards.length === 0) {
+          setCandidates(fallbackCandidates().map((item) => ({ ...item, status: "missing" })));
+          return;
+        }
+        setCandidates(parsedCards);
+      } catch {
+        if (cancelled) return;
+        setCandidates(fallbackCandidates().map((item) => ({ ...item, status: "error" })));
+      }
     }
     void hydrateCandidates();
     return () => {
@@ -235,9 +387,17 @@ export default function PortfolioPage() {
               <CardDescription>Drop candidate cards here to add with a default weight of 5%.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="rounded-lg border bg-muted/30 p-3 text-sm">
+              <div className="grid gap-2 rounded-lg border bg-muted/30 p-3 text-sm md:grid-cols-2">
                 <p className="font-medium">Total weight: {formatWeight(totalWeight)}%</p>
                 <p className="text-muted-foreground">Edit each position weight between 0 and 100.</p>
+                <p className="font-medium">Portfolio risk score: {portfolioMetrics.portfolioRiskScore}</p>
+                <p className="font-medium">
+                  Expected return range: {portfolioMetrics.expectedReturnRange.lowPct}% to{" "}
+                  {portfolioMetrics.expectedReturnRange.highPct}%
+                </p>
+                <p className="text-muted-foreground md:col-span-2">
+                  {portfolioMetrics.sectorConcentrationWarning ?? "Sector concentration is within heuristic threshold."}
+                </p>
               </div>
 
               {positions.length === 0 ? (
@@ -275,13 +435,39 @@ export default function PortfolioPage() {
           <Card>
             <CardHeader>
               <CardTitle>Candidate Feed</CardTitle>
-              <CardDescription>Seeded symbols render immediately; each card hydrates cache freshness from latest analysis.</CardDescription>
+              <CardDescription>Blended ranking from cached projections with freshness badges and quick filters.</CardDescription>
             </CardHeader>
-            <CardContent>
+            <CardContent className="space-y-3">
+              <div className="flex flex-col gap-2 md:flex-row">
+                <Input
+                  value={candidateSearch}
+                  onChange={(event) => setCandidateSearch(event.target.value)}
+                  placeholder="Search symbol or company"
+                />
+                <div className="flex gap-2">
+                  <Button
+                    variant={freshnessFilter === "all" ? "default" : "outline"}
+                    onClick={() => setFreshnessFilter("all")}
+                  >
+                    All
+                  </Button>
+                  <Button
+                    variant={freshnessFilter === "fresh" ? "default" : "outline"}
+                    onClick={() => setFreshnessFilter("fresh")}
+                  >
+                    Fresh
+                  </Button>
+                  <Button
+                    variant={freshnessFilter === "stale" ? "default" : "outline"}
+                    onClick={() => setFreshnessFilter("stale")}
+                  >
+                    Stale
+                  </Button>
+                </div>
+              </div>
               <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-                {SEEDED_CANDIDATES.map((candidate) => {
-                  const meta = candidateMeta[candidate.symbol] ?? { status: "loading", isFresh: null };
-                  const freshness = freshnessBadge(meta);
+                {displayedCandidates.map((candidate) => {
+                  const freshness = freshnessBadge({ status: candidate.status, isFresh: candidate.isFresh });
                   return (
                     <div
                       key={candidate.symbol}
@@ -292,10 +478,17 @@ export default function PortfolioPage() {
                       <div className="mb-2 flex items-start justify-between gap-2">
                         <div>
                           <p className="font-semibold">{candidate.symbol}</p>
-                          <p className="text-xs text-muted-foreground">{candidate.name}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {candidate.name ?? "Unknown company"}
+                            {candidate.sector ? ` · ${candidate.sector}` : ""}
+                          </p>
                         </div>
                         <Badge variant={freshness.variant}>{freshness.label}</Badge>
                       </div>
+                      <p className="mb-2 text-xs text-muted-foreground">
+                        Blend {((candidate.scores?.blended ?? 0) * 100).toFixed(0)} · Risk{" "}
+                        {((candidate.scores?.portfolioRisk ?? 0.5) * 100).toFixed(0)}
+                      </p>
                       <Button className="w-full" variant="outline" onClick={() => upsertPosition(candidate.symbol)}>
                         Add to Portfolio
                       </Button>
