@@ -20,11 +20,10 @@ from app.models.workflow.analysis_workflow_artifact import AnalysisWorkflowArtif
 from app.models.workflow.analysis_workflow_event import AnalysisWorkflowEvent
 from app.models.workflow.analysis_symbol_snapshot import AnalysisSymbolSnapshot
 from app.workflows.analysis.orchestrator import WorkflowOrchestrator
-from app.workflows.analysis.projections.store import (
-    portfolio_impact_signal_score,
-    quality_score_value,
-    recent_change_signal_score,
-    valuation_signal_score,
+from app.workflows.analysis.services import (
+    calculate_portfolio_metrics,
+    default_portfolio_metrics,
+    list_candidate_cards,
 )
 from app.workflows.analysis.sse import SseBroker
 
@@ -49,31 +48,6 @@ def _with_freshness(payload: dict[str, Any], updated_at: datetime | None) -> dic
     return enriched
 
 
-def _is_fresh_from_timestamps(
-    *,
-    freshness_updated_at: datetime | None,
-    freshness_expires_at: datetime | None,
-) -> bool | None:
-    now = datetime.now(UTC)
-    if freshness_expires_at is not None:
-        return freshness_expires_at >= now
-    if freshness_updated_at is not None:
-        return freshness_updated_at >= (now - ANALYSIS_FRESHNESS_TTL)
-    return None
-
-
-def _expected_return_range(
-    quality: float,
-    valuation: float,
-    portfolio_impact: float,
-) -> dict[str, float]:
-    # Heuristic v1 range, bounded for stable UX output.
-    midpoint = 2.0 + (quality * 12.0) + (valuation * 8.0) - ((1.0 - portfolio_impact) * 4.0)
-    low = max(-8.0, midpoint - 5.0)
-    high = min(35.0, midpoint + 5.0)
-    return {"lowPct": round(low, 1), "highPct": round(high, 1)}
-
-
 class TriggerBody(BaseModel):
     symbol: str
 
@@ -85,14 +59,6 @@ class PortfolioPositionBody(BaseModel):
 
 class PortfolioMetricsBody(BaseModel):
     positions: list[PortfolioPositionBody]
-
-
-def _default_portfolio_metrics() -> dict[str, Any]:
-    return {
-        "portfolioRiskScore": 50,
-        "expectedReturnRange": {"lowPct": 0.0, "highPct": 0.0},
-        "sectorConcentrationWarning": None,
-    }
 
 
 def create_workflow_router(
@@ -207,100 +173,14 @@ def create_workflow_router(
         limit: int = Query(default=100, ge=1, le=500),
         db: AsyncSession = Depends(get_db),
     ) -> dict[str, Any]:
-        result = await db.execute(
-            select(AnalysisCandidateCard, StockCatalog.name_display, StockCatalog.sector)
-            .outerjoin(StockCatalog, StockCatalog.id == AnalysisCandidateCard.catalog_id)
-            .order_by(desc(AnalysisCandidateCard.updated_at))
-            .limit(500)
+        return await list_candidate_cards(
+            db,
+            sort_by=sort_by,
+            quality_weight=quality_weight,
+            portfolio_impact_weight=portfolio_impact_weight,
+            valuation_recent_weight=valuation_recent_weight,
+            limit=limit,
         )
-        rows = result.all()
-        total_weight = quality_weight + portfolio_impact_weight + valuation_recent_weight
-        if total_weight <= 0:
-            quality_weight = 0.4
-            portfolio_impact_weight = 0.3
-            valuation_recent_weight = 0.3
-            total_weight = 1.0
-
-        def _build_card(row: Any) -> dict[str, Any]:
-            card, name_display, sector = row
-            quality_component = quality_score_value(card.quality_score)
-            valuation_component = valuation_signal_score(card.valuation_signal)
-            recent_change_component = recent_change_signal_score(card.recent_change_signal)
-            portfolio_impact_component = portfolio_impact_signal_score(card.portfolio_impact_signal)
-            valuation_recent_component = round(
-                (valuation_component + recent_change_component) / 2.0,
-                4,
-            )
-            blended_score = round(
-                (
-                    (quality_component * quality_weight)
-                    + (portfolio_impact_component * portfolio_impact_weight)
-                    + (valuation_recent_component * valuation_recent_weight)
-                )
-                / total_weight,
-                4,
-            )
-            expected_return = _expected_return_range(
-                quality=quality_component,
-                valuation=valuation_component,
-                portfolio_impact=portfolio_impact_component,
-            )
-            return {
-                "symbol": card.symbol,
-                "name": name_display,
-                "sector": sector,
-                "qualityScore": card.quality_score,
-                "valuationSignal": card.valuation_signal,
-                "recentChangeSignal": card.recent_change_signal,
-                "portfolioImpactSignal": card.portfolio_impact_signal,
-                "freshnessUpdatedAt": card.freshness_updated_at.isoformat()
-                if card.freshness_updated_at
-                else None,
-                "freshnessExpiresAt": card.freshness_expires_at.isoformat()
-                if card.freshness_expires_at
-                else None,
-                "isFresh": _is_fresh_from_timestamps(
-                    freshness_updated_at=card.freshness_updated_at,
-                    freshness_expires_at=card.freshness_expires_at,
-                ),
-                "scores": {
-                    "quality": quality_component,
-                    "valuation": valuation_component,
-                    "recentChange": recent_change_component,
-                    "valuationRecent": valuation_recent_component,
-                    "portfolioImpact": portfolio_impact_component,
-                    "blended": blended_score,
-                    "portfolioRisk": round(1.0 - portfolio_impact_component, 4),
-                },
-                "expectedReturnRange": expected_return,
-                "payload": card.card_payload,
-            }
-
-        cards = [_build_card(row) for row in rows]
-
-        def _sort_score(card: dict[str, Any]) -> float:
-            scores = card.get("scores")
-            if not isinstance(scores, dict):
-                return 0.0
-            if sort_by == "quality":
-                return float(scores.get("quality") or 0.0)
-            if sort_by == "portfolio_impact":
-                return float(scores.get("portfolioImpact") or 0.0)
-            if sort_by == "valuation_recent":
-                return float(scores.get("valuationRecent") or 0.0)
-            return float(scores.get("blended") or 0.0)
-
-        cards.sort(key=lambda item: (-_sort_score(item), item["symbol"]))
-        limited_cards = cards[:limit]
-        return {
-            "sortBy": sort_by,
-            "weights": {
-                "quality": quality_weight,
-                "portfolioImpact": portfolio_impact_weight,
-                "valuationRecent": valuation_recent_weight,
-            },
-            "cards": limited_cards,
-        }
 
     @router.post("/portfolio/metrics")
     async def get_portfolio_metrics(
@@ -314,69 +194,9 @@ def create_workflow_router(
                 continue
             weight = max(0.0, min(100.0, float(position.weight)))
             clean_positions.append((symbol, weight))
-
-        total_weight = sum(weight for _, weight in clean_positions)
-        if not clean_positions or total_weight <= 0:
-            return _default_portfolio_metrics()
-
-        symbols = sorted({symbol for symbol, _ in clean_positions})
-        result = await db.execute(
-            select(AnalysisCandidateCard.symbol, AnalysisCandidateCard, StockCatalog.sector)
-            .outerjoin(StockCatalog, StockCatalog.id == AnalysisCandidateCard.catalog_id)
-            .where(AnalysisCandidateCard.symbol.in_(symbols))
-        )
-        rows = result.all()
-        card_by_symbol = {row[0]: (row[1], row[2]) for row in rows}
-
-        weighted_risk = 0.0
-        weighted_low = 0.0
-        weighted_high = 0.0
-        sector_weights: dict[str, float] = {}
-
-        for symbol, weight in clean_positions:
-            normalized_weight = weight / total_weight
-            card_tuple = card_by_symbol.get(symbol)
-            if card_tuple is None:
-                risk = 0.5
-                expected_return = {"lowPct": -1.0, "highPct": 7.0}
-                sector = "Unknown"
-            else:
-                card, sector_value = card_tuple
-                quality_component = quality_score_value(card.quality_score)
-                valuation_component = valuation_signal_score(card.valuation_signal)
-                portfolio_impact_component = portfolio_impact_signal_score(card.portfolio_impact_signal)
-                risk = max(0.0, min(1.0, 1.0 - portfolio_impact_component))
-                expected_return = _expected_return_range(
-                    quality=quality_component,
-                    valuation=valuation_component,
-                    portfolio_impact=portfolio_impact_component,
-                )
-                sector = sector_value.strip() if isinstance(sector_value, str) and sector_value.strip() else "Unknown"
-
-            weighted_risk += normalized_weight * risk
-            weighted_low += normalized_weight * float(expected_return["lowPct"])
-            weighted_high += normalized_weight * float(expected_return["highPct"])
-            sector_weights[sector] = sector_weights.get(sector, 0.0) + normalized_weight
-
-        top_sector = "Unknown"
-        top_weight = 0.0
-        for sector, sector_weight in sector_weights.items():
-            if sector_weight > top_weight:
-                top_sector = sector
-                top_weight = sector_weight
-
-        warning = None
-        if top_weight >= 0.4:
-            warning = f"{top_sector} concentration is high ({round(top_weight * 100)}%)."
-
-        return {
-            "portfolioRiskScore": int(round(weighted_risk * 100)),
-            "expectedReturnRange": {
-                "lowPct": round(weighted_low, 1),
-                "highPct": round(weighted_high, 1),
-            },
-            "sectorConcentrationWarning": warning,
-        }
+        if not clean_positions:
+            return default_portfolio_metrics()
+        return await calculate_portfolio_metrics(db, positions=clean_positions)
 
     @router.get("/workflows/{trace_id}/status")
     async def get_workflow_status(
@@ -575,26 +395,5 @@ def create_workflow_router(
             }
             for item in workflows
         ]
-
-    @router.get("/query/{query_id}/sync")
-    async def sync_query(
-        query_id: str,
-        db: AsyncSession = Depends(get_db),
-    ) -> dict[str, Any]:
-        result = await db.execute(select(AnalysisWorkflow).where(AnalysisWorkflow.id == query_id))
-        workflow = result.scalar_one_or_none()
-        if workflow is None:
-            raise HTTPException(status_code=404, detail="query not found")
-        return {"status": workflow.state, "analysisResultId": None}
-
-    @router.post("/query/{query_id}/mark-failed")
-    async def mark_query_failed(
-        query_id: str,
-        db: AsyncSession = Depends(get_db),
-    ) -> dict[str, str]:
-        ok = await orchestrator.mark_workflow_failed(db=db, workflow_id=query_id)
-        if not ok:
-            raise HTTPException(status_code=404, detail="query not found")
-        return {"status": "failed"}
 
     return router

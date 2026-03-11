@@ -1,6 +1,6 @@
 # CFAI Architecture Decisions
 
-Last validated: 2026-03-11 (maintenance consolidation + observability/persistence fixes)
+Last validated: 2026-03-11 (backend streamline refactor + auth module pruning)
 Purpose: compact ADR index with only active decision signal.
 
 ## Status Keys
@@ -182,6 +182,15 @@ Purpose: compact ADR index with only active decision signal.
   - Build projection normalization base by merging existing snapshot payload when workflow payload is empty.
   - Preserve previously materialized `structuredOutput`/`reverseDcf`/`auditGrowthLikelihood`/`advisorDecision`/`reportMarkdown`/`citations` across transition updates.
   - Use this as the baseline anti-regression rule for snapshot persistence correctness.
+
+### ADR-0024 - Local milestone backend prunes auth module and keeps analysis/maintenance-only surface
+- Date: 2026-03-11
+- Status: `accepted`
+- Why: current product path is portfolio + internal maintenance operations; auth/session complexity and dormant endpoints were adding coupling and dead surface area during active refactor.
+- Impact:
+  - Remove backend auth router, auth dependencies, auth services, and auth models from active module graph.
+  - Keep active API surface focused on analysis trigger/read and maintenance catalog operations.
+  - Reintroduce auth/rbac/quota as a separate hardening slice when milestone scope requires protected multi-user flow.
 
 ## Open Decision Candidates
 

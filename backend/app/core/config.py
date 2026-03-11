@@ -46,16 +46,6 @@ class Settings:
     database_url: str = _normalize_database_url(os.getenv("DATABASE_URL", ""))
     database_url_direct: str = _normalize_database_url(os.getenv("DATABASE_URL_DIRECT", ""))
     frontend_url: str = os.getenv("FRONTEND_URL", "http://localhost:3000")
-    google_oauth_client_id: str = os.getenv("GOOGLE_OAUTH_CLIENT_ID", "")
-    google_oauth_client_secret: str = os.getenv("GOOGLE_OAUTH_CLIENT_SECRET", "")
-    google_oauth_redirect_uri: str = os.getenv(
-        "GOOGLE_OAUTH_REDIRECT_URI",
-        "http://localhost:3001/auth/oauth/google/callback",
-    )
-    session_cookie_name: str = os.getenv("SESSION_COOKIE_NAME", "cfai_session")
-    session_cookie_secure: bool = os.getenv("SESSION_COOKIE_SECURE", "false").lower() == "true"
-    session_ttl_seconds: int = _as_int("SESSION_TTL_SECONDS", 60 * 60 * 24 * 7)
-    password_reset_ttl_seconds: int = _as_int("PASSWORD_RESET_TTL_SECONDS", 60 * 30)
     fmp_api_key: str = os.getenv("FMP_API_KEY", "")
     fmp_base_url: str = os.getenv("FMP_BASE_URL", "https://financialmodelingprep.com")
     fmp_timeout_seconds: int = _as_int("FMP_TIMEOUT_SECONDS", 30)

@@ -109,11 +109,6 @@ class CatalogSeedService(BaseWorkflowRunner):
             result = await db.execute(stmt)
             return list(result.scalars().all())
 
-    async def get_run(self, run_id: str) -> CatalogSeedRun | None:
-        async with self._session_factory() as db:
-            result = await db.execute(select(CatalogSeedRun).where(CatalogSeedRun.id == run_id))
-            return result.scalar_one_or_none()
-
     async def list_catalog_stocks(
         self,
         *,

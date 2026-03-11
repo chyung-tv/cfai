@@ -1,12 +1,12 @@
 # CFAI Architecture Snapshot
 
-Last validated: 2026-03-11 (maintenance consolidation + workflow observability/persistence hardening)
+Last validated: 2026-03-11 (backend streamline refactor + auth module pruning)
 Purpose: concise target-state + current-state architecture for Phase 1.
 
 ## 1) System Shape
 
 - `frontend` (Next.js App Router, shadcn/ui, Tailwind) consumes backend APIs only.
-- `backend` (FastAPI) owns orchestration, auth/policy boundary, and provider integration.
+- `backend` (FastAPI) owns orchestration, maintenance operations, and provider integration for current local milestone scope.
 - Neon-managed `postgres` is source of truth for auth, workflow state/events/artifacts, projections, and catalog.
 - Product interaction hierarchy:
   - primary user surface: portfolio-home UX
@@ -55,10 +55,10 @@ Purpose: concise target-state + current-state architecture for Phase 1.
 
 - Accepted boundary order: auth -> role -> quota (trigger flows).
 - Current reality:
-  - `require_auth` exists and is used on trigger paths.
-  - role guard exists and is used for maintenance admin routes.
+  - auth/session router and guard modules have been pruned from active backend surface for current local milestone.
+  - role guard is not active on maintenance routes in current flow.
   - quota guard is not implemented yet.
-  - analysis read/event routes need explicit final auth policy decision and enforcement.
+  - analysis/maintenance routes are currently open in local milestone flow; policy hardening remains deferred.
 
 ## 5) Provider and Payload Strategy
 

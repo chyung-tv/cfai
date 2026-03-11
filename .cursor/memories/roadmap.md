@@ -1,6 +1,6 @@
 # CFAI Roadmap
 
-Last validated: 2026-03-11 (analysis observability + projection persistence diagnostics hardening)
+Last validated: 2026-03-11 (backend streamline refactor + auth module pruning)
 Purpose: single source of execution status and next actions.
 
 ## Session Briefing (mandatory order)
@@ -11,7 +11,7 @@ Purpose: single source of execution status and next actions.
 
 - Where we are at: portfolio-home remains primary product route with P1/P2 interactions and backend metrics contract, while `/demo/analysis` has been repurposed into an internal maintenance module.
 - What we need to implement next: execute Stage P3 (detail reorganization + explicit deep escalation while keeping stale data visible during refresh) on the product-facing detail flow.
-- What we just implemented: backend observability/persistence hardening for analysis workflows: app-level JSON logging with trace correlation fields, new `/analysis/workflows/{trace_id}/persistence` diagnostic endpoint, and projection base-payload merge to prevent transition updates from null-overwriting artifact-backed snapshot details.
+- What we just implemented: single-pass backend streamlining refactor: extracted candidate/portfolio metrics services from router, declarative orchestrator analysis-step execution, legacy endpoint/module pruning, and full auth module removal with active frontend API seam consolidation.
 
 ## Module Status
 
@@ -35,7 +35,7 @@ Purpose: single source of execution status and next actions.
 
 ## Current Focus
 
-- Active slice: Stage P3 detail reorganization and explicit deep escalation flow (with maintenance module baseline now in place for internal operations).
+- Active slice: post-streamline stabilization after backend architecture cleanup and auth module pruning; then resume Stage P3 detail reorganization and explicit deep escalation flow.
 - Owners: user + coding agent.
 - Blockers: none active for seed/observability; see `./debuglog.md` only for newly reproducible issues.
 

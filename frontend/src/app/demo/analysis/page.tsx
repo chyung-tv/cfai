@@ -6,8 +6,8 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { backendApi } from "@/lib/api/backend";
 
-const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL ?? "http://localhost:3001";
 type SeedRun = {
   id: string;
   status: string;
@@ -112,11 +112,7 @@ export default function AnalysisDemoPage() {
     setSeedLoading(true);
     setSeedError(null);
     try {
-      const response = await fetch(`${BACKEND_URL}/api/v1/admin/maintenance/catalog/seed-runs`, {
-        credentials: "include",
-      });
-      if (!response.ok) throw new Error(`Seed run fetch failed (${response.status})`);
-      const data = (await response.json()) as { runs?: SeedRun[] };
+      const data = await backendApi.listSeedRuns<{ runs?: SeedRun[] }>();
       setSeedRuns(Array.isArray(data.runs) ? data.runs : []);
     } catch (err) {
       setSeedError(err instanceof Error ? err.message : "Unknown seed fetch error");
@@ -129,11 +125,7 @@ export default function AnalysisDemoPage() {
     setSeedTriggering(true);
     setSeedError(null);
     try {
-      const response = await fetch(`${BACKEND_URL}/api/v1/admin/maintenance/catalog/seed/top-us-market-cap`, {
-        method: "POST",
-        credentials: "include",
-      });
-      if (!response.ok) throw new Error(`Seed trigger failed (${response.status})`);
+      await backendApi.triggerSeedRun<{ status?: string; runId?: string }>();
       await loadSeedRuns();
     } catch (err) {
       setSeedError(err instanceof Error ? err.message : "Unknown seed trigger error");
@@ -151,11 +143,7 @@ export default function AnalysisDemoPage() {
       params.set("offset", "0");
       if (catalogQuery.trim()) params.set("query", catalogQuery.trim());
       if (catalogActiveOnly) params.set("is_active", "true");
-      const response = await fetch(`${BACKEND_URL}/api/v1/admin/maintenance/catalog/stocks?${params.toString()}`, {
-        credentials: "include",
-      });
-      if (!response.ok) throw new Error(`Catalog fetch failed (${response.status})`);
-      const data = (await response.json()) as { total?: number; stocks?: StockItem[] };
+      const data = await backendApi.listCatalogStocks<{ total?: number; stocks?: StockItem[] }>(params);
       const items = Array.isArray(data.stocks) ? data.stocks : [];
       setCatalog(items);
       setCatalogTotal(typeof data.total === "number" ? data.total : items.length);
@@ -202,15 +190,7 @@ export default function AnalysisDemoPage() {
           [symbol]: { state: "running", traceId: current[symbol]?.traceId ?? null, error: null },
         }));
         try {
-          const endpoint = `${BACKEND_URL}/analysis/trigger?force=${effectiveForce ? "true" : "false"}`;
-          const response = await fetch(endpoint, {
-            method: "POST",
-            credentials: "include",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ symbol }),
-          });
-          if (!response.ok) throw new Error(`Trigger failed (${response.status})`);
-          const data = (await response.json()) as { traceId?: string };
+          const data = await backendApi.triggerAnalysis<{ traceId?: string }>(symbol, effectiveForce);
           setBatchRows((current) => ({
             ...current,
             [symbol]: { state: "succeeded", traceId: data.traceId ?? null, error: null },

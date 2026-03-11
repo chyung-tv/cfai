@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { backendApi } from "@/lib/api/backend";
 
 type Position = {
   symbol: string;
@@ -75,6 +76,7 @@ type CandidateCardsResponse = {
     } | null;
   }>;
 };
+type CandidateCardInput = NonNullable<CandidateCardsResponse["cards"]>[number];
 
 type PortfolioMetrics = {
   portfolioRiskScore: number;
@@ -91,7 +93,6 @@ type PortfolioMetricsResponse = {
   sectorConcentrationWarning?: string | null;
 };
 
-const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL ?? "http://localhost:3001";
 const STORAGE_KEY = "cfai.portfolio.v1";
 const STORAGE_VERSION = 1;
 const DEFAULT_WEIGHT = 5;
@@ -162,7 +163,7 @@ function freshnessBadge(meta: CandidateMeta): { label: string; variant: "default
   return { label: "Freshness unknown", variant: "outline" };
 }
 
-function toCandidateCard(input: CandidateCardsResponse["cards"][number]): CandidateCard | null {
+function toCandidateCard(input: CandidateCardInput): CandidateCard | null {
   if (!input || typeof input.symbol !== "string" || !input.symbol.trim()) return null;
   const range = input.expectedReturnRange;
   const scores = input.scores;
@@ -346,18 +347,8 @@ export default function PortfolioPage() {
         return;
       }
       try {
-        const response = await fetch(`${BACKEND_URL}/analysis/portfolio/metrics`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          credentials: "include",
-          body: JSON.stringify({ positions }),
-        });
+        const payload = await backendApi.getPortfolioMetrics<PortfolioMetricsResponse>(positions);
         if (cancelled) return;
-        if (!response.ok) {
-          setPortfolioMetrics(fallbackPortfolioMetrics);
-          return;
-        }
-        const payload = (await response.json()) as PortfolioMetricsResponse;
         const range = payload.expectedReturnRange;
         if (
           typeof payload.portfolioRiskScore !== "number" ||
@@ -392,16 +383,7 @@ export default function PortfolioPage() {
     let cancelled = false;
     async function hydrateCandidates(): Promise<void> {
       try {
-        const response = await fetch(
-          `${BACKEND_URL}/analysis/candidates?sort_by=blended&quality_weight=0.4&portfolio_impact_weight=0.3&valuation_recent_weight=0.3&limit=120`,
-          { credentials: "include" },
-        );
-        if (cancelled) return;
-        if (!response.ok) {
-          setCandidates(fallbackCandidates().map((item) => ({ ...item, status: "error" })));
-          return;
-        }
-        const payload = (await response.json()) as CandidateCardsResponse;
+        const payload = await backendApi.getCandidateCards<CandidateCardsResponse>();
         if (cancelled) return;
         const parsedCards = (payload.cards ?? []).map(toCandidateCard).filter((item): item is CandidateCard => item !== null);
         if (parsedCards.length === 0) {

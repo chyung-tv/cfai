@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+from dataclasses import dataclass
 from datetime import datetime, timezone
 import logging
 from typing import Any
@@ -34,6 +35,16 @@ from app.workflows.analysis.projections.store import upsert_workflow_projection
 from app.workflows.analysis.sse import SseBroker
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass(frozen=True)
+class AnalysisStepSpec:
+    node: Any
+    substate: str
+    transition_message: str
+    projection_message: str
+    artifact_type: str
+    output_key: str
 
 
 class WorkflowOrchestrator:
@@ -104,21 +115,6 @@ class WorkflowOrchestrator:
         task = asyncio.create_task(self._run_workflow(workflow_id))
         self._track_task(task)
         return workflow_id
-
-    async def mark_workflow_failed(self, db: AsyncSession, workflow_id: str) -> bool:
-        result = await db.execute(select(AnalysisWorkflow).where(AnalysisWorkflow.id == workflow_id))
-        workflow = result.scalar_one_or_none()
-        if workflow is None:
-            return False
-        await self._runtime.fail(
-            db=db,
-            workflow=workflow,
-            substate="failed",
-            message="Marked failed manually",
-            error_code="manual_failure",
-            payload=None,
-        )
-        return True
 
     async def _run_workflow(self, workflow_id: str) -> None:
         from app.db.session import AsyncSessionLocal
@@ -192,75 +188,13 @@ class WorkflowOrchestrator:
 
                 await self._run_deep_research(db, workflow, context)
 
-                output = await self._run_node_step(
-                    db=db,
-                    workflow=workflow,
-                    context=context,
-                    node=StructuredOutputNode(self._deep_research_client),
-                    substate="structured_output",
-                    transition_message="Structuring deep research output",
-                )
-                await upsert_workflow_projection(db, workflow, message="Structured output persisted")
-                await self._runtime.persist_artifact(
-                    db,
-                    workflow.id,
-                    "structured_output",
-                    output["structuredOutput"],
-                )
-                await db.commit()
-
-                output = await self._run_node_step(
-                    db=db,
-                    workflow=workflow,
-                    context=context,
-                    node=ReverseDcfNode(self._fmp_client),
-                    substate="reverse_dcf",
-                    transition_message="Running reverse DCF calculation",
-                )
-                await upsert_workflow_projection(db, workflow, message="Reverse DCF persisted")
-                await self._runtime.persist_artifact(
-                    db,
-                    workflow.id,
-                    "reverse_dcf",
-                    output["reverseDcf"],
-                )
-                await db.commit()
-
-                output = await self._run_node_step(
-                    db=db,
-                    workflow=workflow,
-                    context=context,
-                    node=AuditGrowthLikelihoodNode(self._deep_research_client),
-                    substate="audit_growth_likelihood",
-                    transition_message="Auditing growth likelihood against deep research evidence",
-                )
-                await upsert_workflow_projection(
-                    db, workflow, message="Audit growth likelihood persisted"
-                )
-                await self._runtime.persist_artifact(
-                    db,
-                    workflow.id,
-                    "audit_growth_likelihood",
-                    output["auditGrowthLikelihood"],
-                )
-                await db.commit()
-
-                output = await self._run_node_step(
-                    db=db,
-                    workflow=workflow,
-                    context=context,
-                    node=AdvisorDecisionNode(self._advisor_client),
-                    substate="advisor_decision",
-                    transition_message="Generating investor-profile advisor actions",
-                )
-                await upsert_workflow_projection(db, workflow, message="Advisor decision persisted")
-                await self._runtime.persist_artifact(
-                    db,
-                    workflow.id,
-                    "advisor_decision",
-                    output["advisorDecision"],
-                )
-                await db.commit()
+                for step in self._analysis_steps():
+                    await self._execute_analysis_step(
+                        db=db,
+                        workflow=workflow,
+                        context=context,
+                        step=step,
+                    )
 
                 await self._run_node_step(
                     db=db,
@@ -296,6 +230,69 @@ class WorkflowOrchestrator:
                         "substate": workflow.substate,
                     },
                 )
+
+    def _analysis_steps(self) -> list[AnalysisStepSpec]:
+        return [
+            AnalysisStepSpec(
+                node=StructuredOutputNode(self._deep_research_client),
+                substate="structured_output",
+                transition_message="Structuring deep research output",
+                projection_message="Structured output persisted",
+                artifact_type="structured_output",
+                output_key="structuredOutput",
+            ),
+            AnalysisStepSpec(
+                node=ReverseDcfNode(self._fmp_client),
+                substate="reverse_dcf",
+                transition_message="Running reverse DCF calculation",
+                projection_message="Reverse DCF persisted",
+                artifact_type="reverse_dcf",
+                output_key="reverseDcf",
+            ),
+            AnalysisStepSpec(
+                node=AuditGrowthLikelihoodNode(self._deep_research_client),
+                substate="audit_growth_likelihood",
+                transition_message="Auditing growth likelihood against deep research evidence",
+                projection_message="Audit growth likelihood persisted",
+                artifact_type="audit_growth_likelihood",
+                output_key="auditGrowthLikelihood",
+            ),
+            AnalysisStepSpec(
+                node=AdvisorDecisionNode(self._advisor_client),
+                substate="advisor_decision",
+                transition_message="Generating investor-profile advisor actions",
+                projection_message="Advisor decision persisted",
+                artifact_type="advisor_decision",
+                output_key="advisorDecision",
+            ),
+        ]
+
+    async def _execute_analysis_step(
+        self,
+        *,
+        db: AsyncSession,
+        workflow: AnalysisWorkflow,
+        context: WorkflowContext,
+        step: AnalysisStepSpec,
+    ) -> None:
+        output = await self._run_node_step(
+            db=db,
+            workflow=workflow,
+            context=context,
+            node=step.node,
+            substate=step.substate,
+            transition_message=step.transition_message,
+        )
+        await upsert_workflow_projection(db, workflow, message=step.projection_message)
+        artifact_payload = output.get(step.output_key)
+        if isinstance(artifact_payload, dict):
+            await self._runtime.persist_artifact(
+                db,
+                workflow.id,
+                step.artifact_type,
+                artifact_payload,
+            )
+        await db.commit()
 
     async def _run_node_step(
         self,
