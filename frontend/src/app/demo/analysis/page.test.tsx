@@ -16,47 +16,62 @@ describe("AnalysisDemoPage", () => {
     vi.clearAllMocks();
   });
 
-  it("renders internal-lab controls and badges", () => {
+  it("renders maintenance sections", () => {
     render(<AnalysisDemoPage />);
 
-    expect(screen.getByText("Analysis Observation Lab (Internal)")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Trigger Workflow" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Refresh from DB" })).toBeInTheDocument();
-    expect(screen.getByText("idle")).toBeInTheDocument();
-    expect(screen.getByText("Freshness unknown")).toBeInTheDocument();
+    expect(screen.getByText("Maintenance (Internal)")).toBeInTheDocument();
+    expect(screen.getByText("Fetch")).toBeInTheDocument();
+    expect(screen.getByText("Stock Catalogue")).toBeInTheDocument();
+    expect(screen.getByText("Mass Update Analysis")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Run Mass Update" })).toBeDisabled();
   });
 
-  it("shows loaded status and freshness badge on successful refresh", async () => {
+  it("loads catalog, selects symbol, and runs mass update", async () => {
     fetchMock.mockResolvedValueOnce({
       ok: true,
       json: async () => ({
-        summary: {
-          analysisFreshness: {
-            isFresh: true,
+        total: 1,
+        stocks: [
+          {
+            symbol: "AAPL",
+            nameDisplay: "Apple",
+            sector: "Technology",
+            marketCap: 1000,
+            isActive: true,
+            selectionRank: 1,
+            updatedAt: "2026-03-11T00:00:00Z",
           },
-        },
+        ],
+      }),
+    });
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        traceId: "trace-1",
       }),
     });
 
     render(<AnalysisDemoPage />);
-    await userEvent.click(screen.getByRole("button", { name: "Refresh from DB" }));
+    await userEvent.click(screen.getByRole("button", { name: "Load Catalogue" }));
+    await userEvent.click(screen.getByLabelText("Select AAPL"));
+    await userEvent.click(screen.getByRole("button", { name: "Run Mass Update" }));
 
-    await screen.findByText("completed_cached / latest_loaded");
-    expect(screen.getByText("Fresh (<=7d)")).toBeInTheDocument();
+    await screen.findByText("trace-1");
+    expect(screen.getByText("succeeded")).toBeInTheDocument();
   });
 
-  it("shows an error alert when refresh fails", async () => {
+  it("shows an error alert when catalog fetch fails", async () => {
     fetchMock.mockResolvedValueOnce({
       ok: false,
       status: 500,
     });
 
     render(<AnalysisDemoPage />);
-    await userEvent.click(screen.getByRole("button", { name: "Refresh from DB" }));
+    await userEvent.click(screen.getByRole("button", { name: "Load Catalogue" }));
 
     await waitFor(() => {
-      expect(screen.getByText("Analysis error")).toBeInTheDocument();
+      expect(screen.getByText("Catalogue error")).toBeInTheDocument();
     });
-    expect(screen.getByText("failed / latest_fetch_failed")).toBeInTheDocument();
+    expect(screen.getByText("Catalog fetch failed (500)")).toBeInTheDocument();
   });
 });

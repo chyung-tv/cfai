@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text
 
 from app.core.config import settings
+from app.core.logging import configure_app_logging
 from app.db.session import AsyncSessionLocal
 from app.providers.advisor_client import AdvisorClient
 from app.providers.fmp_client import FmpClient
@@ -13,6 +14,8 @@ from app.routers.workflow import create_workflow_router
 from app.workflows.analysis.orchestrator import WorkflowOrchestrator
 from app.workflows.analysis.sse import SseBroker
 from app.workflows.maintenance.seed_service import CatalogSeedService
+
+configure_app_logging(level=settings.app_log_level)
 
 app = FastAPI(title="CFAI Backend", version="0.1.0")
 allowed_origins = {

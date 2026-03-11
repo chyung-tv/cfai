@@ -7,7 +7,7 @@ from datetime import UTC, datetime
 from typing import Any
 from uuid import uuid4
 
-from sqlalchemy import Select, desc, func, select
+from sqlalchemy import Select, and_, desc, func, or_, select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
@@ -113,6 +113,53 @@ class CatalogSeedService(BaseWorkflowRunner):
         async with self._session_factory() as db:
             result = await db.execute(select(CatalogSeedRun).where(CatalogSeedRun.id == run_id))
             return result.scalar_one_or_none()
+
+    async def list_catalog_stocks(
+        self,
+        *,
+        query: str | None = None,
+        is_active: bool | None = None,
+        limit: int = 100,
+        offset: int = 0,
+    ) -> tuple[list[StockCatalog], int]:
+        normalized_limit = max(1, min(limit, 500))
+        normalized_offset = max(0, offset)
+        filters = []
+        if is_active is not None:
+            filters.append(StockCatalog.is_active == is_active)
+        if query:
+            normalized_query = query.strip().upper()
+            if normalized_query:
+                like_pattern = f"%{normalized_query}%"
+                filters.append(
+                    or_(
+                        StockCatalog.symbol.ilike(like_pattern),
+                        StockCatalog.name_display.ilike(like_pattern),
+                    )
+                )
+
+        async with self._session_factory() as db:
+            stmt = select(StockCatalog)
+            count_stmt = select(func.count()).select_from(StockCatalog)
+            if filters:
+                predicate = and_(*filters)
+                stmt = stmt.where(predicate)
+                count_stmt = count_stmt.where(predicate)
+            stmt = (
+                stmt.order_by(
+                    StockCatalog.is_active.desc(),
+                    StockCatalog.selection_rank.is_(None),
+                    StockCatalog.selection_rank.asc(),
+                    desc(StockCatalog.market_cap),
+                    StockCatalog.symbol.asc(),
+                )
+                .limit(normalized_limit)
+                .offset(normalized_offset)
+            )
+            rows = await db.execute(stmt)
+            count_result = await db.execute(count_stmt)
+            total = int(count_result.scalar_one() or 0)
+            return list(rows.scalars().all()), total
 
     async def _execute_seed(self, run_id: str) -> None:
         try:

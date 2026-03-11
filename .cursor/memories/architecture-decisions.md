@@ -1,6 +1,6 @@
 # CFAI Architecture Decisions
 
-Last validated: 2026-03-10 (portfolio-first product hierarchy decisions)
+Last validated: 2026-03-11 (maintenance consolidation + observability/persistence fixes)
 Purpose: compact ADR index with only active decision signal.
 
 ## Status Keys
@@ -147,13 +147,48 @@ Purpose: compact ADR index with only active decision signal.
   - Add backend stalled-no-progress monitor with env-configurable thresholds/cooldown and structured correlation logs.
   - Keep implementation backend-first; frontend observability changes remain optional and deferred.
 
+### ADR-0020 - P2 portfolio metrics are backend-owned; candidate default ranking is blended
+- Date: 2026-03-11
+- Status: `accepted`
+- Why: keep portfolio metrics consistent across clients and avoid divergence from duplicated frontend-only formulas while preserving fast candidate triage.
+- Impact:
+  - Add backend contract endpoint for portfolio metrics (`/analysis/portfolio/metrics`) returning `portfolioRiskScore`, `expectedReturnRange`, and `sectorConcentrationWarning`.
+  - Frontend `portfolio-home` consumes backend metrics contract with safe fallback behavior.
+  - Candidate feed default sort for v1 is locked to `blended`.
+
+### ADR-0021 - Internal observe page is consolidated into maintenance module controls
+- Date: 2026-03-11
+- Status: `accepted`
+- Why: operational workflows now require one internal surface to seed/fetch catalog and trigger controlled mass analysis updates without polluting the primary portfolio UX.
+- Impact:
+  - `/demo/analysis` is maintained as an internal maintenance page with sections for fetch, stock catalogue, and mass update analysis.
+  - Add maintenance catalog listing API for FE stock selection (`/api/v1/admin/maintenance/catalog/stocks`).
+  - Mass update uses explicit operator controls (mode/force/run count) with bounded client-side concurrency.
+
+### ADR-0022 - Analysis workflow observability uses app-level JSON logs and trace-level persistence inspection
+- Date: 2026-03-11
+- Status: `accepted`
+- Why: access logs alone were insufficient to diagnose whether batch-triggered workflows actually persisted artifacts/snapshots; operators needed deterministic correlation per trace.
+- Impact:
+  - Configure backend app logging to emit JSON logs at app level with correlation fields (`trace_id`, `symbol`, `event_type`, `substate`, `duration_ms`, `error_code`).
+  - Keep workflow lifecycle visibility in backend logs for enqueue, node progress, artifact persistence, projection updates, and terminal transitions.
+  - Add `/analysis/workflows/{trace_id}/persistence` diagnostic API for workflow/event/artifact/snapshot linkage checks and basic stall-vs-overwrite classification.
+
+### ADR-0023 - Projection transition updates must preserve artifact-backed payload fields
+- Date: 2026-03-11
+- Status: `accepted`
+- Why: transition-only projection upserts could regress snapshot details/summary to null by normalizing from an empty base payload between artifact writes.
+- Impact:
+  - Build projection normalization base by merging existing snapshot payload when workflow payload is empty.
+  - Preserve previously materialized `structuredOutput`/`reverseDcf`/`auditGrowthLikelihood`/`advisorDecision`/`reportMarkdown`/`citations` across transition updates.
+  - Use this as the baseline anti-regression rule for snapshot persistence correctness.
+
 ## Open Decision Candidates
 
 - Auth/rbac/quota reintroduction plan and sequencing after core milestone completion.
 - Quota model details (limits, reset cadence, role overrides, error semantics).
 - Default add weight for portfolio builder (`5%` proposed).
 - v1 formula contract for portfolio risk score and expected return range.
-- Candidate feed default ranking policy.
 
 ## References
 

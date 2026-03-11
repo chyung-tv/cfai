@@ -82,6 +82,15 @@ type PortfolioMetrics = {
   sectorConcentrationWarning: string | null;
 };
 
+type PortfolioMetricsResponse = {
+  portfolioRiskScore?: number;
+  expectedReturnRange?: {
+    lowPct?: number;
+    highPct?: number;
+  } | null;
+  sectorConcentrationWarning?: string | null;
+};
+
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL ?? "http://localhost:3001";
 const STORAGE_KEY = "cfai.portfolio.v1";
 const STORAGE_VERSION = 1;
@@ -228,6 +237,14 @@ function getInitialPositions(): Position[] {
   }
 }
 
+function defaultPortfolioMetrics(): PortfolioMetrics {
+  return {
+    portfolioRiskScore: 50,
+    expectedReturnRange: { lowPct: 0, highPct: 0 },
+    sectorConcentrationWarning: null,
+  };
+}
+
 export default function PortfolioPage() {
   const [positions, setPositions] = useState<Position[]>(() => getInitialPositions());
   const [draggingOverPortfolio, setDraggingOverPortfolio] = useState(false);
@@ -243,13 +260,9 @@ export default function PortfolioPage() {
     () => new Map(candidates.map((candidate) => [candidate.symbol, candidate])),
     [candidates],
   );
-  const portfolioMetrics = useMemo<PortfolioMetrics>(() => {
+  const fallbackPortfolioMetrics = useMemo<PortfolioMetrics>(() => {
     if (positions.length === 0 || totalWeight <= 0) {
-      return {
-        portfolioRiskScore: 50,
-        expectedReturnRange: { lowPct: 0, highPct: 0 },
-        sectorConcentrationWarning: null,
-      };
+      return defaultPortfolioMetrics();
     }
     let weightedRisk = 0;
     let weightedLow = 0;
@@ -288,6 +301,7 @@ export default function PortfolioPage() {
       sectorConcentrationWarning,
     };
   }, [candidateBySymbol, positions, totalWeight]);
+  const [portfolioMetrics, setPortfolioMetrics] = useState<PortfolioMetrics>(() => defaultPortfolioMetrics());
   const displayedCandidates = useMemo(() => {
     const query = candidateSearch.trim().toUpperCase();
     return candidates.filter((candidate) => {
@@ -323,6 +337,56 @@ export default function PortfolioPage() {
     const payload: StoredPortfolio = { version: STORAGE_VERSION, positions };
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
   }, [positions]);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function hydratePortfolioMetrics(): Promise<void> {
+      if (positions.length === 0) {
+        setPortfolioMetrics(defaultPortfolioMetrics());
+        return;
+      }
+      try {
+        const response = await fetch(`${BACKEND_URL}/analysis/portfolio/metrics`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({ positions }),
+        });
+        if (cancelled) return;
+        if (!response.ok) {
+          setPortfolioMetrics(fallbackPortfolioMetrics);
+          return;
+        }
+        const payload = (await response.json()) as PortfolioMetricsResponse;
+        const range = payload.expectedReturnRange;
+        if (
+          typeof payload.portfolioRiskScore !== "number" ||
+          !range ||
+          typeof range.lowPct !== "number" ||
+          typeof range.highPct !== "number"
+        ) {
+          setPortfolioMetrics(fallbackPortfolioMetrics);
+          return;
+        }
+        setPortfolioMetrics({
+          portfolioRiskScore: Math.round(payload.portfolioRiskScore),
+          expectedReturnRange: {
+            lowPct: Number(range.lowPct.toFixed(1)),
+            highPct: Number(range.highPct.toFixed(1)),
+          },
+          sectorConcentrationWarning:
+            typeof payload.sectorConcentrationWarning === "string" ? payload.sectorConcentrationWarning : null,
+        });
+      } catch {
+        if (cancelled) return;
+        setPortfolioMetrics(fallbackPortfolioMetrics);
+      }
+    }
+    void hydratePortfolioMetrics();
+    return () => {
+      cancelled = true;
+    };
+  }, [fallbackPortfolioMetrics, positions]);
 
   useEffect(() => {
     let cancelled = false;

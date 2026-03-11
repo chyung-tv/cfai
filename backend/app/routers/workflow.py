@@ -16,6 +16,7 @@ from app.db.session import get_db
 from app.models.workflow.analysis_candidate_card import AnalysisCandidateCard
 from app.models.workflow.stock_catalog import StockCatalog
 from app.models.workflow.analysis_workflow import AnalysisWorkflow
+from app.models.workflow.analysis_workflow_artifact import AnalysisWorkflowArtifact
 from app.models.workflow.analysis_workflow_event import AnalysisWorkflowEvent
 from app.models.workflow.analysis_symbol_snapshot import AnalysisSymbolSnapshot
 from app.workflows.analysis.orchestrator import WorkflowOrchestrator
@@ -75,6 +76,23 @@ def _expected_return_range(
 
 class TriggerBody(BaseModel):
     symbol: str
+
+
+class PortfolioPositionBody(BaseModel):
+    symbol: str
+    weight: float
+
+
+class PortfolioMetricsBody(BaseModel):
+    positions: list[PortfolioPositionBody]
+
+
+def _default_portfolio_metrics() -> dict[str, Any]:
+    return {
+        "portfolioRiskScore": 50,
+        "expectedReturnRange": {"lowPct": 0.0, "highPct": 0.0},
+        "sectorConcentrationWarning": None,
+    }
 
 
 def create_workflow_router(
@@ -284,6 +302,82 @@ def create_workflow_router(
             "cards": limited_cards,
         }
 
+    @router.post("/portfolio/metrics")
+    async def get_portfolio_metrics(
+        body: PortfolioMetricsBody,
+        db: AsyncSession = Depends(get_db),
+    ) -> dict[str, Any]:
+        clean_positions: list[tuple[str, float]] = []
+        for position in body.positions:
+            symbol = position.symbol.strip().upper()
+            if not symbol:
+                continue
+            weight = max(0.0, min(100.0, float(position.weight)))
+            clean_positions.append((symbol, weight))
+
+        total_weight = sum(weight for _, weight in clean_positions)
+        if not clean_positions or total_weight <= 0:
+            return _default_portfolio_metrics()
+
+        symbols = sorted({symbol for symbol, _ in clean_positions})
+        result = await db.execute(
+            select(AnalysisCandidateCard.symbol, AnalysisCandidateCard, StockCatalog.sector)
+            .outerjoin(StockCatalog, StockCatalog.id == AnalysisCandidateCard.catalog_id)
+            .where(AnalysisCandidateCard.symbol.in_(symbols))
+        )
+        rows = result.all()
+        card_by_symbol = {row[0]: (row[1], row[2]) for row in rows}
+
+        weighted_risk = 0.0
+        weighted_low = 0.0
+        weighted_high = 0.0
+        sector_weights: dict[str, float] = {}
+
+        for symbol, weight in clean_positions:
+            normalized_weight = weight / total_weight
+            card_tuple = card_by_symbol.get(symbol)
+            if card_tuple is None:
+                risk = 0.5
+                expected_return = {"lowPct": -1.0, "highPct": 7.0}
+                sector = "Unknown"
+            else:
+                card, sector_value = card_tuple
+                quality_component = quality_score_value(card.quality_score)
+                valuation_component = valuation_signal_score(card.valuation_signal)
+                portfolio_impact_component = portfolio_impact_signal_score(card.portfolio_impact_signal)
+                risk = max(0.0, min(1.0, 1.0 - portfolio_impact_component))
+                expected_return = _expected_return_range(
+                    quality=quality_component,
+                    valuation=valuation_component,
+                    portfolio_impact=portfolio_impact_component,
+                )
+                sector = sector_value.strip() if isinstance(sector_value, str) and sector_value.strip() else "Unknown"
+
+            weighted_risk += normalized_weight * risk
+            weighted_low += normalized_weight * float(expected_return["lowPct"])
+            weighted_high += normalized_weight * float(expected_return["highPct"])
+            sector_weights[sector] = sector_weights.get(sector, 0.0) + normalized_weight
+
+        top_sector = "Unknown"
+        top_weight = 0.0
+        for sector, sector_weight in sector_weights.items():
+            if sector_weight > top_weight:
+                top_sector = sector
+                top_weight = sector_weight
+
+        warning = None
+        if top_weight >= 0.4:
+            warning = f"{top_sector} concentration is high ({round(top_weight * 100)}%)."
+
+        return {
+            "portfolioRiskScore": int(round(weighted_risk * 100)),
+            "expectedReturnRange": {
+                "lowPct": round(weighted_low, 1),
+                "highPct": round(weighted_high, 1),
+            },
+            "sectorConcentrationWarning": warning,
+        }
+
     @router.get("/workflows/{trace_id}/status")
     async def get_workflow_status(
         trace_id: str,
@@ -367,6 +461,101 @@ def create_workflow_router(
                 }
                 for event in events
             ],
+        }
+
+    @router.get("/workflows/{trace_id}/persistence")
+    async def get_workflow_persistence(
+        trace_id: str,
+        db: AsyncSession = Depends(get_db),
+    ) -> dict[str, Any]:
+        workflow_result = await db.execute(
+            select(AnalysisWorkflow).where(AnalysisWorkflow.id == trace_id)
+        )
+        workflow = workflow_result.scalar_one_or_none()
+        if workflow is None:
+            raise HTTPException(status_code=404, detail="workflow not found")
+
+        artifacts_result = await db.execute(
+            select(AnalysisWorkflowArtifact)
+            .where(AnalysisWorkflowArtifact.workflow_id == trace_id)
+            .order_by(AnalysisWorkflowArtifact.produced_at.asc())
+        )
+        artifacts = artifacts_result.scalars().all()
+        event_result = await db.execute(
+            select(AnalysisWorkflowEvent)
+            .where(AnalysisWorkflowEvent.workflow_id == trace_id)
+            .order_by(desc(AnalysisWorkflowEvent.created_at))
+            .limit(1)
+        )
+        latest_event = event_result.scalar_one_or_none()
+        snapshot_result = await db.execute(
+            select(AnalysisSymbolSnapshot).where(AnalysisSymbolSnapshot.symbol == workflow.symbol)
+        )
+        snapshot = snapshot_result.scalar_one_or_none()
+
+        details = snapshot.details if snapshot is not None and isinstance(snapshot.details, dict) else None
+        summary = snapshot.summary if snapshot is not None and isinstance(snapshot.summary, dict) else None
+        model_metadata = (
+            snapshot.model_metadata if snapshot is not None and isinstance(snapshot.model_metadata, dict) else None
+        )
+        return {
+            "workflow": {
+                "id": workflow.id,
+                "symbol": workflow.symbol,
+                "state": workflow.state,
+                "substate": workflow.substate,
+                "errorCode": workflow.error_code,
+                "errorMessage": workflow.error_message,
+                "createdAt": workflow.created_at.isoformat(),
+                "updatedAt": workflow.updated_at.isoformat(),
+                "completedAt": workflow.completed_at.isoformat() if workflow.completed_at else None,
+            },
+            "latestEvent": (
+                {
+                    "state": latest_event.state,
+                    "substate": latest_event.substate,
+                    "eventType": latest_event.event_type,
+                    "message": latest_event.message,
+                    "createdAt": latest_event.created_at.isoformat(),
+                }
+                if latest_event
+                else None
+            ),
+            "artifacts": [
+                {
+                    "type": artifact.artifact_type,
+                    "version": artifact.artifact_version,
+                    "producedAt": artifact.produced_at.isoformat(),
+                    "payloadKeys": sorted(list(artifact.payload.keys()))
+                    if isinstance(artifact.payload, dict)
+                    else [],
+                }
+                for artifact in artifacts
+            ],
+            "artifactTypeSet": sorted({artifact.artifact_type for artifact in artifacts}),
+            "snapshot": (
+                {
+                    "symbol": snapshot.symbol,
+                    "latestWorkflowId": snapshot.latest_workflow_id,
+                    "state": snapshot.state,
+                    "summaryIsNull": summary is None,
+                    "detailsIsNull": details is None,
+                    "modelMetadataIsNull": model_metadata is None,
+                    "hasStructuredOutput": isinstance(details.get("structuredOutput"), dict)
+                    if isinstance(details, dict)
+                    else False,
+                    "updatedAt": snapshot.updated_at.isoformat(),
+                }
+                if snapshot is not None
+                else None
+            ),
+            "classification": {
+                "isTerminal": workflow.state in {"completed", "completed_cached", "failed", "cancelled"},
+                "hasArtifacts": len(artifacts) > 0,
+                "artifactCount": len(artifacts),
+                "suspectExecutionStall": workflow.state == "running" and len(artifacts) == 0,
+                "suspectProjectionOverwrite": len(artifacts) > 0 and snapshot is not None and details is None,
+            },
         }
 
     @router.get("/history")

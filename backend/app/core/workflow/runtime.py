@@ -149,6 +149,18 @@ class WorkflowRuntime:
             artifact_type=artifact_type,
             artifact_payload=payload,
         )
+        logger.info(
+            "artifact_persisted trace_id=%s symbol=%s artifact_type=%s",
+            workflow.id,
+            workflow.symbol,
+            artifact_type,
+            extra={
+                "trace_id": workflow.id,
+                "symbol": workflow.symbol,
+                "event_type": "artifact_persisted",
+                "substate": workflow.substate,
+            },
+        )
 
     async def _append_event(
         self,
@@ -190,6 +202,12 @@ class WorkflowRuntime:
             substate,
             event_type,
             message,
+            extra={
+                "trace_id": workflow.id,
+                "symbol": workflow.symbol,
+                "event_type": event_type,
+                "substate": substate,
+            },
         )
         sse_payload: dict[str, Any] = {"eventType": event_type}
         if payload:

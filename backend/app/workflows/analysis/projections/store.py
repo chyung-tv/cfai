@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import copy
 from datetime import datetime, timezone
+import logging
 from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -12,6 +14,8 @@ from app.workflows.analysis.projections.normalizer import (
     CONTRACT_VERSION,
     normalize_projection_payload,
 )
+
+logger = logging.getLogger(__name__)
 
 DEFAULT_QUALITY_SCORE = 0.5
 DEFAULT_VALUATION_SCORE = 0.5
@@ -46,14 +50,16 @@ async def upsert_workflow_projection(
     artifact_type: str | None = None,
     artifact_payload: dict[str, Any] | None = None,
 ) -> None:
+    snapshot = await db.get(AnalysisSymbolSnapshot, workflow.symbol)
     normalized_payload, warnings = normalize_projection_payload(
-        base_payload=context_payload(workflow),
+        base_payload=merge_base_payload(
+            workflow_payload=context_payload(workflow),
+            snapshot=snapshot,
+        ),
         artifact_type=artifact_type,
         artifact_payload=artifact_payload,
     )
     current_event_at = latest_event_at or datetime.now(timezone.utc)
-
-    snapshot = await db.get(AnalysisSymbolSnapshot, workflow.symbol)
     if snapshot is None:
         snapshot = AnalysisSymbolSnapshot(symbol=workflow.symbol)
     snapshot.catalog_id = workflow.catalog_id
@@ -88,12 +94,50 @@ async def upsert_workflow_projection(
     }
     card.updated_at = current_event_at
     db.add(card)
+    logger.info(
+        "projection_updated trace_id=%s symbol=%s state=%s artifact_type=%s",
+        workflow.id,
+        workflow.symbol,
+        workflow.state,
+        artifact_type,
+        extra={
+            "trace_id": workflow.id,
+            "symbol": workflow.symbol,
+            "event_type": "projection_updated",
+            "substate": workflow.substate,
+        },
+    )
 
 
 def context_payload(workflow: AnalysisWorkflow) -> dict[str, Any] | None:
     # Result payload is now sourced from artifacts; workflow row is metadata only.
     raw = getattr(workflow, "result_payload", None)
     return raw if isinstance(raw, dict) else None
+
+
+def merge_base_payload(
+    *,
+    workflow_payload: dict[str, Any] | None,
+    snapshot: AnalysisSymbolSnapshot | None,
+) -> dict[str, Any] | None:
+    base = copy.deepcopy(workflow_payload) if isinstance(workflow_payload, dict) else {}
+    if snapshot is None:
+        return base or None
+    details = snapshot.details if isinstance(snapshot.details, dict) else {}
+    # Projection normalizer expects top-level artifact keys, so remap snapshot details back.
+    for key in (
+        "structuredOutput",
+        "reverseDcf",
+        "auditGrowthLikelihood",
+        "advisorDecision",
+        "reportMarkdown",
+        "citations",
+    ):
+        if key not in base and key in details:
+            base[key] = copy.deepcopy(details[key])
+    if "modelMetadata" not in base and isinstance(snapshot.model_metadata, dict):
+        base["modelMetadata"] = copy.deepcopy(snapshot.model_metadata)
+    return base or None
 
 
 def _quality_score(summary: dict[str, Any]) -> float | None:

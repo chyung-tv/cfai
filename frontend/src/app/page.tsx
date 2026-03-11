@@ -4,7 +4,7 @@ export default function Home() {
       <div className="w-full max-w-xl rounded border border-zinc-200 bg-white p-6 dark:border-zinc-800 dark:bg-zinc-900">
         <h1 className="text-xl font-semibold">CFAI Frontend</h1>
         <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
-          Portfolio Home is the primary product path. Analysis Lab remains available for internal observability.
+          Portfolio Home is the primary product path. Maintenance module remains available for internal operations.
         </p>
         <div className="mt-4 flex flex-wrap gap-2">
           <a
@@ -17,7 +17,7 @@ export default function Home() {
             href="/demo/analysis"
             className="inline-flex rounded border border-zinc-300 px-4 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-100 dark:border-zinc-700 dark:text-zinc-200 dark:hover:bg-zinc-800"
           >
-            Open Internal Analysis Lab
+            Open Internal Maintenance
           </a>
         </div>
       </div>

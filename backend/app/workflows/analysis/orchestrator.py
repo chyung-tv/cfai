@@ -94,6 +94,11 @@ class WorkflowOrchestrator:
             workflow.id,
             workflow.symbol,
             workflow.force_refresh,
+            extra={
+                "trace_id": workflow.id,
+                "symbol": workflow.symbol,
+                "event_type": "workflow_enqueued",
+            },
         )
 
         task = asyncio.create_task(self._run_workflow(workflow_id))
@@ -284,6 +289,12 @@ class WorkflowOrchestrator:
                     workflow.id,
                     workflow.symbol,
                     workflow.substate,
+                    extra={
+                        "trace_id": workflow.id,
+                        "symbol": workflow.symbol,
+                        "event_type": "workflow_failed",
+                        "substate": workflow.substate,
+                    },
                 )
 
     async def _run_node_step(
@@ -319,6 +330,12 @@ class WorkflowOrchestrator:
             workflow.id,
             workflow.symbol,
             substate,
+            extra={
+                "trace_id": workflow.id,
+                "symbol": workflow.symbol,
+                "event_type": "node_started",
+                "substate": substate,
+            },
         )
         interval_seconds = max(1, settings.workflow_node_heartbeat_interval_seconds)
         node_task = asyncio.create_task(node.execute(context))
@@ -344,6 +361,13 @@ class WorkflowOrchestrator:
                         workflow.symbol,
                         substate,
                         elapsed_ms,
+                        extra={
+                            "trace_id": workflow.id,
+                            "symbol": workflow.symbol,
+                            "event_type": "node_heartbeat",
+                            "substate": substate,
+                            "duration_ms": elapsed_ms,
+                        },
                     )
         except TimeoutError as exc:
             duration_ms = int((datetime.now(timezone.utc) - started_at).total_seconds() * 1000)
@@ -364,6 +388,13 @@ class WorkflowOrchestrator:
                 workflow.symbol,
                 substate,
                 duration_ms,
+                extra={
+                    "trace_id": workflow.id,
+                    "symbol": workflow.symbol,
+                    "event_type": "node_timeout",
+                    "substate": substate,
+                    "duration_ms": duration_ms,
+                },
             )
             raise
         except Exception as exc:
@@ -386,6 +417,13 @@ class WorkflowOrchestrator:
                 workflow.symbol,
                 substate,
                 duration_ms,
+                extra={
+                    "trace_id": workflow.id,
+                    "symbol": workflow.symbol,
+                    "event_type": "node_failed",
+                    "substate": substate,
+                    "duration_ms": duration_ms,
+                },
             )
             raise
         duration_ms = int((datetime.now(timezone.utc) - started_at).total_seconds() * 1000)
@@ -402,6 +440,13 @@ class WorkflowOrchestrator:
             workflow.symbol,
             substate,
             duration_ms,
+            extra={
+                "trace_id": workflow.id,
+                "symbol": workflow.symbol,
+                "event_type": "node_succeeded",
+                "substate": substate,
+                "duration_ms": duration_ms,
+            },
         )
         return output
 
@@ -621,11 +666,21 @@ class WorkflowOrchestrator:
                             workflow.symbol,
                             workflow.substate,
                             int(elapsed_seconds),
+                            extra={
+                                "trace_id": workflow.id,
+                                "symbol": workflow.symbol,
+                                "event_type": "stalled_no_progress",
+                                "substate": workflow.substate,
+                                "duration_ms": int(elapsed_seconds * 1000),
+                            },
                         )
             except asyncio.CancelledError:
                 raise
             except Exception:
-                logger.exception("workflow_stall_monitor_error")
+                logger.exception(
+                    "workflow_stall_monitor_error",
+                    extra={"event_type": "stall_monitor_error"},
+                )
             await asyncio.sleep(interval_seconds)
 
 

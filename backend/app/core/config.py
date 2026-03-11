@@ -42,6 +42,7 @@ def _normalize_database_url(raw: str) -> str:
 @dataclass(frozen=True)
 class Settings:
     app_env: str = os.getenv("APP_ENV", "development")
+    app_log_level: str = os.getenv("APP_LOG_LEVEL", "INFO")
     database_url: str = _normalize_database_url(os.getenv("DATABASE_URL", ""))
     database_url_direct: str = _normalize_database_url(os.getenv("DATABASE_URL_DIRECT", ""))
     frontend_url: str = os.getenv("FRONTEND_URL", "http://localhost:3000")

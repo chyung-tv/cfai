@@ -1,6 +1,6 @@
 # CFAI Architecture Snapshot
 
-Last validated: 2026-03-10 (portfolio-first product hierarchy alignment)
+Last validated: 2026-03-11 (maintenance consolidation + workflow observability/persistence hardening)
 Purpose: concise target-state + current-state architecture for Phase 1.
 
 ## 1) System Shape
@@ -11,7 +11,7 @@ Purpose: concise target-state + current-state architecture for Phase 1.
 - Product interaction hierarchy:
   - primary user surface: portfolio-home UX
   - supporting engine: analysis workflow/projections
-  - internal tool: analysis observation lab
+  - internal tool: maintenance module (fetch, stock catalogue, mass update analysis)
 
 ## 2) Workflow Domains
 
@@ -26,6 +26,9 @@ Purpose: concise target-state + current-state architecture for Phase 1.
 - Purpose: async stock intelligence pipeline supporting portfolio decisions.
 - Node chain: `resolve_query` -> `deep_research` -> `structured_output` -> `reverse_dcf` -> `audit_growth_likelihood` -> `advisor_decision` -> persistence + SSE.
 - Contract: trigger returns processing + trace ID; progress is SSE + persisted events.
+- Operational diagnostics:
+  - trace-level status/timeline API is available for workflow debugging.
+  - persistence inspection API is available at `/analysis/workflows/{trace_id}/persistence` for workflow/artifact/snapshot linkage checks.
 - Mode policy:
   - default: lightweight path
   - deep path: explicit user escalation action
@@ -37,7 +40,7 @@ Purpose: concise target-state + current-state architecture for Phase 1.
   - `analysis_workflow_events`
   - `analysis_workflow_artifacts`
 - Frontend read model:
-  - `analysis_workflow_projections` (event/artifact-driven updates)
+  - `analysis_symbol_snapshots` and `analysis_candidate_cards` (event/artifact-driven projection outputs)
   - versioned normalization boundary via `contract_version`
 - Current API read path:
   - `/analysis/latest` reads projection first, then fallback to workflow row.
@@ -45,6 +48,8 @@ Purpose: concise target-state + current-state architecture for Phase 1.
   - candidate card snapshots with freshness metadata
   - per-symbol fields consumable by portfolio metrics computation
   - cache-first response semantics
+- Projection persistence policy:
+  - transition-only projection updates must preserve already-materialized artifact-backed fields (no null overwrite regression).
 
 ## 4) Auth/RBAC/Quota Boundary
 
@@ -68,7 +73,7 @@ Purpose: concise target-state + current-state architecture for Phase 1.
 
 - Quota implementation and policy observability (deferred in local-first milestone).
 - Finalized auth policy for analysis read/event endpoints (deferred in local-first milestone).
-- Reprojection tooling + stronger projection contract hardening.
+- Reprojection tooling + stronger projection contract hardening beyond current merge-safe baseline.
 - Seed universe expansion beyond current top-500 proxy set.
 - Account-backed portfolio persistence and multi-portfolio management.
 - Local fallback DB story after Docker removal (if Neon unavailable during development).

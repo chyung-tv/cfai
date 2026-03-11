@@ -1,6 +1,6 @@
 # CFAI Roadmap
 
-Last validated: 2026-03-10 (maintenance seed + workflow observability stabilization complete)
+Last validated: 2026-03-11 (analysis observability + projection persistence diagnostics hardening)
 Purpose: single source of execution status and next actions.
 
 ## Session Briefing (mandatory order)
@@ -9,17 +9,17 @@ Purpose: single source of execution status and next actions.
 2. What we need to implement next
 3. What we just implemented
 
-- Where we are at: portfolio-home is implemented as the primary route with drag/add, weight edit/remove, seeded candidates, freshness/no-cache cues, and local persistence; infra baseline now targets Neon without Docker orchestration; maintenance seed and workflow observability reliability unblocks are completed.
-- What we need to implement next: execute Stage P2 (portfolio metrics and candidate ranking/filtering for faster 1-2 minute decisions), starting with backend read aggregation contract for `portfolioRiskScore` / `expectedReturnRange` / `sectorConcentrationWarning`.
-- What we just implemented: Neon DB migration baseline (`DATABASE_URL` pooled + `DATABASE_URL_DIRECT` for migrations), Docker artifact removal, env split (`frontend/.env.local`, `backend/.env`), maintenance seed simplification to screener-only enrichment with env-configurable Top-N + market-cap threshold plus idempotent naming (`top_us_market_cap`), and backend workflow observability upgrades (node-level timeline events, status/timeline APIs, heartbeat + stalled-no-progress monitor, structured server logs), including SQLAlchemy async session-concurrency fixes in orchestrator/reverse DCF paths.
+- Where we are at: portfolio-home remains primary product route with P1/P2 interactions and backend metrics contract, while `/demo/analysis` has been repurposed into an internal maintenance module.
+- What we need to implement next: execute Stage P3 (detail reorganization + explicit deep escalation while keeping stale data visible during refresh) on the product-facing detail flow.
+- What we just implemented: backend observability/persistence hardening for analysis workflows: app-level JSON logging with trace correlation fields, new `/analysis/workflows/{trace_id}/persistence` diagnostic endpoint, and projection base-payload merge to prevent transition updates from null-overwriting artifact-backed snapshot details.
 
 ## Module Status
 
 - [x] Module 1 - Runtime foundation and workflow plumbing
 - [x] Module 2 - Projection-backed analysis read path
 - [x] Module 3 - Portfolio-first UX reframe (docs/contracts)
-- [~] Module 4 - Portfolio home implementation (P1/P2) *(active)*
-- [ ] Module 5 - Detail reorg + deep escalation flow (P3)
+- [x] Module 4 - Portfolio home implementation (P1/P2)
+- [~] Module 5 - Detail reorg + deep escalation flow (P3) *(active)*
 - [ ] Module 6 - Internal observation lab boundary + milestone gate (P4)
 
 ## Reality Check (2026-03-10)
@@ -27,13 +27,15 @@ Purpose: single source of execution status and next actions.
 - Backend analysis workflow exists end-to-end: `resolve_query` -> `deep_research` -> `structured_output` -> `reverse_dcf` -> `audit_growth_likelihood` -> `advisor_decision`.
 - Projection read model exists; `/analysis/latest` is projection-first with fallback.
 - Frontend now has dedicated `/portfolio` route for primary product flow.
-- `/demo/analysis` has been reduced to internal controls/status badges for observability.
+- `/demo/analysis` has been consolidated as internal maintenance module (fetch, stock catalogue, mass update analysis).
 - Product priority changed: portfolio builder is the intended user product, not workflow observability.
 - Quota guard is still deferred; auth/rbac are intentionally relaxed in local milestone flow.
+- Backend now emits app-level JSON workflow logs with trace correlation and exposes `/analysis/workflows/{trace_id}/persistence` for persistence diagnostics.
+- Projection update path now preserves artifact-backed snapshot details during transition-only updates.
 
 ## Current Focus
 
-- Active slice: Stage P2 portfolio metrics and candidate ranking/filtering (with Neon-backed terminal-native environment).
+- Active slice: Stage P3 detail reorganization and explicit deep escalation flow (with maintenance module baseline now in place for internal operations).
 - Owners: user + coding agent.
 - Blockers: none active for seed/observability; see `./debuglog.md` only for newly reproducible issues.
 
@@ -70,7 +72,7 @@ Acceptance:
 - user can build a portfolio from empty state and recover it after page reload.
 
 ### Stage P2 - Portfolio Metrics and Candidate Ranking
-Status: `pending`
+Status: `completed`
 Goal: make the page useful for 1-2 minute portfolio decisions.
 
 Implementation checklist:
@@ -86,7 +88,7 @@ Implementation checklist:
      - `sectorConcentrationWarning`
    - recompute on all position/weight changes
 3. Candidate feed ranking/filtering
-   - implement initial ranking default (to be finalized from open decision)
+   - implement initial ranking default (`blended` for v1)
    - preserve responsiveness under cache-first policy
 
 Acceptance:
@@ -141,7 +143,7 @@ Acceptance:
 
 1. Default add weight: fixed to `5%` for P1; revisit only if user requests rebalance behavior.
 2. Risk/return formula shape for v1: heuristic now vs model-backed now.
-3. Candidate feed default sorting: quality-first vs portfolio-impact-first.
+3. Candidate feed default sorting for v1: `blended` (locked 2026-03-11).
 4. Seed refresh policy for initial ~50 stocks: manual vs scheduled.
 
 ## Product Blueprint Reference

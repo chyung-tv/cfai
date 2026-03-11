@@ -14,7 +14,7 @@ Make portfolio construction the primary user experience:
 
 - Primary mode: portfolio builder dashboard (`portfolio-home`) as v1 north-star screen.
 - Analysis workflow is an intelligence engine feeding portfolio decisions.
-- Existing analysis page remains an internal observation lab for debugging/inspection.
+- Existing internal tooling surface is a maintenance module for fetch/catalog operations and controlled mass analysis updates.
 - v1 output style: evidence-first; no explicit final buy/hold/avoid verdict.
 - Data freshness policy: show cached data fast with `last updated` badge and predictable refresh behavior.
 - Analysis modes:
@@ -63,9 +63,13 @@ Make portfolio construction the primary user experience:
   - current mode label (`lightweight`/`deep`)
   - `Run Deep Analysis` action
 
-### Analysis Observation Lab (Internal Tool)
-- Keep `/demo/analysis` as non-primary, internal-facing workflow observability UI.
-- Use for pipeline debugging, payload inspection, and execution timeline verification.
+### Maintenance Module (Internal Tool)
+- Keep `/demo/analysis` as non-primary, internal-facing maintenance UI.
+- Internal module sections:
+  - fetch/seed controls for stock catalog maintenance
+  - stock catalogue list for operator selection
+  - mass update analysis controls (run count, selected symbols, explicit mode/force options)
+- Use this module for pipeline operations and troubleshooting without changing portfolio-first product direction.
 
 ## 4) Module Function Contracts (v1)
 
