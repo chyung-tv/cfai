@@ -122,7 +122,7 @@ export type MemoryPanelResponse = {
   memories: Array<{
     id: number;
     key: string;
-    value: unknown;
+    value: string;
     type: string;
     confidence: number;
     updatedAt: string;
@@ -134,7 +134,7 @@ export type MemoryPanelResponse = {
 export type MemoryDetail = {
   id: number;
   key: string;
-  value: Record<string, unknown>;
+  value: string;
   type: string;
   confidence: number;
   rationale: string;
@@ -235,6 +235,15 @@ export const copilotClient = {
   },
   createThread(title?: string): Promise<{ thread: { id: string; title: string; createdAt: string; updatedAt: string } }> {
     return apiPost("/copilot/threads/create", { title: title ?? null }, "Thread create");
+  },
+  deleteThread(threadId: string): Promise<{ deleted: boolean }> {
+    return fetch(`${BACKEND_URL}/copilot/threads/${encodeURIComponent(threadId)}`, {
+      method: "DELETE",
+      credentials: "include",
+    }).then(async (response) => {
+      if (!response.ok) throw await toApiError(response, "Thread delete");
+      return (await response.json()) as { deleted: boolean };
+    });
   },
   createDocument(
     title: string,
@@ -337,12 +346,12 @@ export const copilotClient = {
   getRule(ruleId: number): Promise<{ rule: RuleItem }> {
     return apiGet<{ rule: RuleItem }>(`/copilot/rules/${ruleId}`, "Rule fetch");
   },
-  updateRule(ruleId: number, ruleText: string): Promise<{ rule: RuleItem }> {
+  updateRule(ruleId: number, payload: { ruleText: string; isActive: boolean }): Promise<{ rule: RuleItem }> {
     return fetch(`${BACKEND_URL}/copilot/rules/${ruleId}`, {
       method: "PUT",
       credentials: "include",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ruleText }),
+      body: JSON.stringify(payload),
     }).then(async (response) => {
       if (!response.ok) throw await toApiError(response, "Rule update");
       return (await response.json()) as { rule: RuleItem };
@@ -367,7 +376,7 @@ export const copilotClient = {
     memoryId: number,
     payload: {
       key: string;
-      value: Record<string, unknown>;
+      value: string;
       type: string;
       confidence: number;
       rationale: string;

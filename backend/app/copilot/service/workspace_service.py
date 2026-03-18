@@ -6,7 +6,7 @@ import re
 from typing import Any
 from uuid import uuid4
 
-from sqlalchemy import desc, select
+from sqlalchemy import desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.copilot.canonical_document import CanonicalDocument
@@ -25,6 +25,8 @@ from app.tools.documents.workflows.validate_patch import validate_document_conte
 
 LEDGER_KEY = "portfolio_ledger"
 JOURNAL_KEY = "strategy_journal"
+THREAD_TITLE_LIMIT = 160
+DEFAULT_THREAD_TITLES = {"New Chat", "Primary Workspace", "Workspace Thread"}
 
 DEFAULT_LEDGER = """# Portfolio Ledger
 
@@ -58,6 +60,13 @@ def _parse_optional_datetime(value: Any) -> datetime | None:
         return datetime.fromisoformat(value)
     except ValueError:
         return None
+
+
+def _derive_thread_title_from_query(text: str) -> str:
+    collapsed = re.sub(r"\s+", " ", (text or "").strip())
+    if not collapsed:
+        return ""
+    return collapsed[:THREAD_TITLE_LIMIT]
 
 
 class CopilotWorkspaceService:
@@ -229,10 +238,18 @@ class CopilotWorkspaceService:
 
     async def create_thread(self, db: AsyncSession, title: str | None = None) -> CopilotThread:
         clean_title = (title or "").strip() or "New Chat"
-        thread = CopilotThread(id=str(uuid4()), title=clean_title[:160])
+        thread = CopilotThread(id=str(uuid4()), title=clean_title[:THREAD_TITLE_LIMIT])
         db.add(thread)
         await db.flush()
         return thread
+
+    async def delete_thread(self, db: AsyncSession, *, thread_id: str) -> None:
+        result = await db.execute(select(CopilotThread).where(CopilotThread.id == thread_id.strip()))
+        row = result.scalar_one_or_none()
+        if row is None:
+            raise LookupError("thread_not_found")
+        await db.delete(row)
+        await db.flush()
 
     async def list_messages(self, db: AsyncSession, thread_id: str) -> list[CopilotMessage]:
         result = await db.execute(
@@ -251,10 +268,23 @@ class CopilotWorkspaceService:
         user_content: str,
         assistant_content: str,
     ) -> tuple[CopilotMessage, CopilotMessage]:
+        clean_user_content = user_content.strip()
+        existing_user_count_result = await db.execute(
+            select(func.count(CopilotMessage.id)).where(
+                CopilotMessage.thread_id == thread.id,
+                CopilotMessage.role == "user",
+            )
+        )
+        existing_user_count = int(existing_user_count_result.scalar_one() or 0)
+        if existing_user_count == 0 and thread.title in DEFAULT_THREAD_TITLES:
+            proposed_title = _derive_thread_title_from_query(clean_user_content)
+            if proposed_title:
+                thread.title = proposed_title
+
         user_message = CopilotMessage(
             thread_id=thread.id,
             role="user",
-            content=user_content.strip(),
+            content=clean_user_content,
         )
         assistant_message = CopilotMessage(
             thread_id=thread.id,
@@ -270,7 +300,6 @@ class CopilotWorkspaceService:
     async def list_rules(self, db: AsyncSession) -> list[CopilotRule]:
         result = await db.execute(
             select(CopilotRule)
-            .where(CopilotRule.is_active.is_(True))
             .order_by(CopilotRule.created_at.asc(), CopilotRule.id.asc())
         )
         return list(result.scalars().all())
@@ -285,7 +314,7 @@ class CopilotWorkspaceService:
         result = await db.execute(select(CopilotRule).where(CopilotRule.id == rule_id))
         return result.scalar_one_or_none()
 
-    async def update_rule(self, db: AsyncSession, *, rule_id: int, rule_text: str) -> CopilotRule:
+    async def update_rule(self, db: AsyncSession, *, rule_id: int, rule_text: str, is_active: bool) -> CopilotRule:
         row = await self.get_rule(db, rule_id=rule_id)
         if row is None:
             raise LookupError("rule_not_found")
@@ -293,6 +322,7 @@ class CopilotWorkspaceService:
         if not clean:
             raise ValueError("rule_text_required")
         row.rule_text = clean
+        row.is_active = is_active
         await db.flush()
         return row
 
@@ -532,7 +562,7 @@ class CopilotWorkspaceService:
                     entity_key=str(memory.id),
                     payload_json={
                         "memoryKey": memory.memory_key,
-                        "memoryValueJson": memory.memory_value_json,
+                        "memoryValueText": memory.memory_value_text,
                         "memoryType": memory.memory_type,
                         "confidence": float(memory.confidence),
                         "rationale": memory.rationale,
@@ -691,7 +721,7 @@ class CopilotWorkspaceService:
                 CopilotMemory(
                     user_id=user_id,
                     memory_key=memory_key.strip(),
-                    memory_value_json=payload.get("memoryValueJson") if isinstance(payload.get("memoryValueJson"), dict) else {},
+                    memory_value_text=str(payload.get("memoryValueText") or ""),
                     memory_type=str(payload.get("memoryType") or "preference"),
                     confidence=float(payload.get("confidence") or 0.0),
                     rationale=str(payload.get("rationale") or ""),

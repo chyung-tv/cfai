@@ -1,9 +1,8 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Any
 
-from sqlalchemy import JSON, Boolean, DateTime, Float, ForeignKey, Index, Integer, String, Text, func
+from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Index, Integer, String, Text, func
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base
@@ -30,7 +29,7 @@ class CopilotMemory(Base):
         nullable=True,
     )
     memory_key: Mapped[str] = mapped_column(String(160), nullable=False)
-    memory_value_json: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False, default=dict)
+    memory_value_text: Mapped[str] = mapped_column(Text, nullable=False, server_default="")
     memory_type: Mapped[str] = mapped_column(String(40), nullable=False, server_default="preference")
     confidence: Mapped[float] = mapped_column(Float, nullable=False, server_default="0")
     rationale: Mapped[str] = mapped_column(Text, nullable=False, server_default="")

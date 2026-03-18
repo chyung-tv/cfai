@@ -4,6 +4,7 @@ import { useEffect, useRef, type RefObject } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
+import { Loader2, Send } from "lucide-react";
 
 export type ChatMessage = {
   id: number | string;
@@ -83,8 +84,15 @@ export function ChatPane({
               }
             }}
           />
-          <Button className="h-10 rounded-lg px-4" onClick={onSubmit} disabled={submitting || !composerValue.trim()}>
-            {submitting ? "Sending..." : "Send"}
+          <Button
+            size="icon"
+            className="h-10 w-10 rounded-lg"
+            onClick={onSubmit}
+            disabled={submitting || !composerValue.trim()}
+            aria-label={submitting ? "Sending message" : "Send message"}
+            title={submitting ? "Sending..." : "Send"}
+          >
+            {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
           </Button>
         </div>
       </div>

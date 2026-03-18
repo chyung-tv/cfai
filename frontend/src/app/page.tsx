@@ -13,13 +13,9 @@ import {
   type ExplorerTab,
 } from "@/features/workspace/components";
 import {
-  parseMemoryMarkdown,
   parseMemorySummaryMarkdown,
-  parseRuleMarkdown,
   parseSkillMarkdown,
-  toMemoryMarkdown,
   toMemorySummaryMarkdown,
-  toRuleMarkdown,
   toSkillMarkdown,
 } from "@/features/workspace/components/entity_markdown";
 import {
@@ -31,6 +27,7 @@ import {
   type WorkspaceSnapshot,
 } from "@/shared/api/copilot_client";
 import { streamClient } from "@/shared/api/stream_client";
+import { FilePenLine, Files, MessageSquare, MessagesSquare } from "lucide-react";
 
 const STORAGE_CHAT_WIDTH = "cfai.workspace.chatWidth.v2";
 const STORAGE_DOC_WIDTH = "cfai.workspace.docWidth.v2";
@@ -103,10 +100,18 @@ export default function Home() {
   const [skillsCatalog, setSkillsCatalog] = useState<SkillDetail[]>([]);
   const [rulesCatalog, setRulesCatalog] = useState<RuleItem[]>([]);
   const [memoryFacts, setMemoryFacts] = useState<
-    Array<{ id: number; key: string; value: unknown; type: string; confidence: number; updatedAt: string }>
+    Array<{ id: number; key: string; value: string; type: string; confidence: number; updatedAt: string }>
   >([]);
   const [memorySummary, setMemorySummary] = useState("");
   const [memorySummaryVersion, setMemorySummaryVersion] = useState(0);
+  const [memoryValueDraft, setMemoryValueDraft] = useState("");
+  const [memoryEditorMeta, setMemoryEditorMeta] = useState<{
+    key: string;
+    type: string;
+    confidence: number;
+    rationale: string;
+  } | null>(null);
+  const [ruleIsActiveDraft, setRuleIsActiveDraft] = useState(true);
   const [memoryToasts, setMemoryToasts] = useState<Array<{ id: string; text: string }>>([]);
   const chatInputRef = useRef<HTMLInputElement | null>(null);
   const layoutRef = useRef<HTMLDivElement | null>(null);
@@ -149,7 +154,7 @@ export default function Home() {
       rules: rulesCatalog.map((rule) => ({
         id: String(rule.id),
         title: `Rule ${rule.id}`,
-        subtitle: rule.ruleText,
+        subtitle: `${rule.isActive ? "active" : "inactive"} · ${rule.ruleText}`,
         entityType: "rule",
       })),
       memories: [
@@ -310,6 +315,17 @@ export default function Home() {
     }
   }
 
+  async function onDeleteThread(targetThreadId: string): Promise<void> {
+    if (!targetThreadId) return;
+    if (!window.confirm("Delete this chat and all its messages? This cannot be undone.")) return;
+    try {
+      await copilotClient.deleteThread(targetThreadId);
+      await loadWorkspace(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to delete thread.");
+    }
+  }
+
   useEffect(() => {
     const savedChatWidth = window.localStorage.getItem(STORAGE_CHAT_WIDTH);
     const savedChatPaneWidth = window.localStorage.getItem(STORAGE_CHAT_PANE_WIDTH);
@@ -356,12 +372,26 @@ export default function Home() {
         await copilotClient.updateWorkingDocument(editorEntity.id, editorDraft);
         await loadWorkspace(threadId);
       } else if (editorEntity.entityType === "rule") {
-        const payload = parseRuleMarkdown(editorDraft);
-        await copilotClient.updateRule(Number(editorEntity.id), payload.ruleText);
+        const nextRuleText = editorDraft.trim();
+        if (!nextRuleText) {
+          throw new Error("Rule body cannot be empty.");
+        }
+        await copilotClient.updateRule(Number(editorEntity.id), {
+          ruleText: nextRuleText,
+          isActive: ruleIsActiveDraft,
+        });
         await refreshExplorerData();
       } else if (editorEntity.entityType === "memory") {
-        const payload = parseMemoryMarkdown(editorDraft);
-        await copilotClient.updateMemory(Number(editorEntity.id), payload);
+        if (!memoryEditorMeta) {
+          throw new Error("Memory metadata missing; reopen memory and try again.");
+        }
+        await copilotClient.updateMemory(Number(editorEntity.id), {
+          key: memoryEditorMeta.key,
+          value: memoryValueDraft,
+          type: memoryEditorMeta.type,
+          confidence: memoryEditorMeta.confidence,
+          rationale: memoryEditorMeta.rationale,
+        });
         await refreshExplorerData();
       } else if (editorEntity.entityType === "memory_summary") {
         const payload = parseMemorySummaryMarkdown(editorDraft);
@@ -459,6 +489,9 @@ export default function Home() {
       setEditorEntity(null);
       setEditorDraft("");
       setActiveExplorerItemId("");
+      setRuleIsActiveDraft(true);
+      setMemoryEditorMeta(null);
+      setMemoryValueDraft("");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to delete item.");
     } finally {
@@ -478,29 +511,49 @@ export default function Home() {
         }
         setEditorEntity({ entityType: "document", id: doc.key, title: doc.title });
         setEditorDraft(doc.content);
+        setRuleIsActiveDraft(true);
+        setMemoryEditorMeta(null);
+        setMemoryValueDraft("");
         return;
       }
       if (item.entityType === "rule") {
         const response = await copilotClient.getRule(Number(item.id));
         setEditorEntity({ entityType: "rule", id: item.id, title: `Rule ${item.id}` });
-        setEditorDraft(toRuleMarkdown(response.rule));
+        setEditorDraft(response.rule.ruleText);
+        setRuleIsActiveDraft(response.rule.isActive);
+        setMemoryEditorMeta(null);
+        setMemoryValueDraft("");
         return;
       }
       if (item.entityType === "memory") {
         const response = await copilotClient.getMemory(Number(item.id));
         setEditorEntity({ entityType: "memory", id: item.id, title: response.memory.key });
-        setEditorDraft(toMemoryMarkdown(response.memory));
+        setMemoryValueDraft(response.memory.value || "");
+        setMemoryEditorMeta({
+          key: response.memory.key,
+          type: response.memory.type,
+          confidence: response.memory.confidence,
+          rationale: response.memory.rationale,
+        });
+        setEditorDraft("");
+        setRuleIsActiveDraft(true);
         return;
       }
       if (item.entityType === "memory_summary") {
         setEditorEntity({ entityType: "memory_summary", id: "summary", title: "Memory Summary" });
         setEditorDraft(toMemorySummaryMarkdown(memorySummary));
+        setRuleIsActiveDraft(true);
+        setMemoryEditorMeta(null);
+        setMemoryValueDraft("");
         return;
       }
       if (item.entityType === "skill") {
         const response = await copilotClient.getSkill(item.id);
         setEditorEntity({ entityType: "skill", id: item.id, title: response.skill.name });
         setEditorDraft(toSkillMarkdown(response.skill));
+        setRuleIsActiveDraft(true);
+        setMemoryEditorMeta(null);
+        setMemoryValueDraft("");
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to open item.");
@@ -595,17 +648,41 @@ export default function Home() {
         <div className="text-xs text-muted-foreground">Drag pane boundaries to resize</div>
         <p className="text-base font-semibold tracking-tight">CFAI Workspace</p>
         <div className="flex items-center justify-end gap-1">
-          <Button size="sm" variant={paneVisibility.chats ? "default" : "outline"} onClick={() => togglePane("chats")}>
-            Chats
+          <Button
+            size="icon"
+            variant={paneVisibility.chats ? "default" : "outline"}
+            onClick={() => togglePane("chats")}
+            aria-label="Toggle chats rail"
+            title="Chats rail"
+          >
+            <MessagesSquare className="h-4 w-4" />
           </Button>
-          <Button size="sm" variant={paneVisibility.chat ? "default" : "outline"} onClick={() => togglePane("chat")}>
-            Chat
+          <Button
+            size="icon"
+            variant={paneVisibility.chat ? "default" : "outline"}
+            onClick={() => togglePane("chat")}
+            aria-label="Toggle chat pane"
+            title="Chat pane"
+          >
+            <MessageSquare className="h-4 w-4" />
           </Button>
-          <Button size="sm" variant={paneVisibility.document ? "default" : "outline"} onClick={() => togglePane("document")}>
-            Document
+          <Button
+            size="icon"
+            variant={paneVisibility.document ? "default" : "outline"}
+            onClick={() => togglePane("document")}
+            aria-label="Toggle editor pane"
+            title="Editor pane"
+          >
+            <FilePenLine className="h-4 w-4" />
           </Button>
-          <Button size="sm" variant={paneVisibility.documents ? "default" : "outline"} onClick={() => togglePane("documents")}>
-            Documents
+          <Button
+            size="icon"
+            variant={paneVisibility.documents ? "default" : "outline"}
+            onClick={() => togglePane("documents")}
+            aria-label="Toggle explorer pane"
+            title="Explorer pane"
+          >
+            <Files className="h-4 w-4" />
           </Button>
         </div>
       </div>
@@ -625,6 +702,7 @@ export default function Home() {
                   activeThreadId={threadId}
                   onSelectThread={(nextThreadId) => void loadWorkspace(nextThreadId)}
                   onNewThread={() => void onCreateThread()}
+                  onDeleteThread={(targetThreadId) => void onDeleteThread(targetThreadId)}
                 />
               ) : null}
               {pane === "chat" ? (
@@ -646,10 +724,14 @@ export default function Home() {
                   entityId={editorEntity?.id ?? ""}
                   document={activeDocument}
                   draftContent={editorDraft}
+                  memoryValue={memoryValueDraft}
+                  ruleIsActive={ruleIsActiveDraft}
                   saving={savingEntity}
                   deleting={deletingEntity}
                   canDelete={Boolean(editorEntity)}
                   onDraftChange={setEditorDraft}
+                  onMemoryValueChange={setMemoryValueDraft}
+                  onRuleIsActiveChange={setRuleIsActiveDraft}
                   onSave={() => void onSaveEditorEntity()}
                   onDelete={() => void onDeleteEditorEntity()}
                   onHide={() => togglePane("document")}
@@ -668,7 +750,11 @@ export default function Home() {
                   committingSnapshot={committingCheckpoint}
                   restoringSnapshot={revertingRevision}
                   ruleInput={ruleInput}
-                  rules={rulesCatalog.map((rule) => ({ id: rule.id, ruleText: rule.ruleText }))}
+                  rules={rulesCatalog.map((rule) => ({
+                    id: rule.id,
+                    ruleText: rule.ruleText,
+                    isActive: rule.isActive,
+                  }))}
                   onRuleInputChange={setRuleInput}
                   onAddRule={() => void onAddRule()}
                   onCommitSnapshot={() => void onCommitCheckpoint()}

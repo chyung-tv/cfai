@@ -35,6 +35,7 @@ class AddRuleBody(BaseModel):
 
 class UpdateRuleBody(BaseModel):
     ruleText: str = Field(min_length=1, max_length=2000)
+    isActive: bool = True
 
 
 class CreateThreadBody(BaseModel):
@@ -88,7 +89,7 @@ class UpdateSkillBody(BaseModel):
 
 class UpdateMemoryBody(BaseModel):
     key: str = Field(min_length=1, max_length=160)
-    value: dict[str, Any]
+    value: str = Field(default="", max_length=10000)
     type: str = Field(min_length=1, max_length=40)
     confidence: float = Field(ge=0.0, le=1.0)
     rationale: str = Field(default="", max_length=2000)
@@ -269,6 +270,15 @@ def create_copilot_router(
             }
         }
 
+    @router.delete("/threads/{thread_id}")
+    async def delete_thread(thread_id: str, db: AsyncSession = Depends(get_db)) -> dict[str, Any]:
+        try:
+            await service.delete_thread(db, thread_id=thread_id)
+        except LookupError as exc:
+            raise HTTPException(status_code=404, detail="thread not found") from exc
+        await db.commit()
+        return {"deleted": True}
+
     @router.post("/chat/turn/stream")
     async def stream_chat_turn(
         body: ChatTurnBody,
@@ -320,12 +330,12 @@ def create_copilot_router(
                     user_id=user_id,
                     user_message=body.message.strip(),
                     recent_messages=[AgentMessage(role=item.role, content=item.content) for item in messages[-20:]],
-                    active_rules=[rule.rule_text for rule in rules],
+                    active_rules=[rule.rule_text for rule in rules if rule.is_active],
                     document_keys=[doc.doc_key for doc in documents],
                     memory_facts=[
                         {
                             "key": memory.memory_key,
-                            "value": memory.memory_value_json,
+                            "value": memory.memory_value_text,
                             "confidence": round(float(memory.confidence), 2),
                             "type": memory.memory_type,
                         }
@@ -495,7 +505,7 @@ def create_copilot_router(
                 {
                     "id": row.id,
                     "key": row.memory_key,
-                    "value": row.memory_value_json,
+                    "value": row.memory_value_text,
                     "type": row.memory_type,
                     "confidence": row.confidence,
                     "updatedAt": row.updated_at.isoformat(),
@@ -521,7 +531,7 @@ def create_copilot_router(
             "memory": {
                 "id": row.id,
                 "key": row.memory_key,
-                "value": row.memory_value_json,
+                "value": row.memory_value_text,
                 "type": row.memory_type,
                 "confidence": row.confidence,
                 "rationale": row.rationale,
@@ -543,7 +553,7 @@ def create_copilot_router(
                 user_id=user_id,
                 memory_id=memory_id,
                 key=body.key,
-                value=body.value,
+                value_text=body.value,
                 memory_type=body.type,
                 confidence=body.confidence,
                 rationale=body.rationale,
@@ -555,7 +565,7 @@ def create_copilot_router(
             "memory": {
                 "id": row.id,
                 "key": row.memory_key,
-                "value": row.memory_value_json,
+                "value": row.memory_value_text,
                 "type": row.memory_type,
                 "confidence": row.confidence,
                 "rationale": row.rationale,
@@ -683,7 +693,12 @@ def create_copilot_router(
         db: AsyncSession = Depends(get_db),
     ) -> dict[str, Any]:
         try:
-            row = await service.update_rule(db, rule_id=rule_id, rule_text=body.ruleText)
+            row = await service.update_rule(
+                db,
+                rule_id=rule_id,
+                rule_text=body.ruleText,
+                is_active=body.isActive,
+            )
         except LookupError as exc:
             raise HTTPException(status_code=404, detail="rule not found") from exc
         except ValueError as exc:

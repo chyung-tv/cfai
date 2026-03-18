@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
+import json
 import re
 from typing import Any
 
@@ -26,7 +27,7 @@ _KEY_ALIASES = {
 @dataclass(frozen=True)
 class MemoryCandidate:
     key: str
-    value: dict[str, Any]
+    value_text: str
     memory_type: str
     confidence: float
     rationale: str
@@ -65,7 +66,7 @@ class MemoryService:
             key = item.memory_key.lower()
             if key in query:
                 score += 0.4
-            value_blob = " ".join(str(v).lower() for v in item.memory_value_json.values())
+            value_blob = (item.memory_value_text or "").lower()
             if any(token in value_blob for token in query.split() if len(token) >= 4):
                 score += 0.2
             if item.memory_type in {"constraint", "risk_profile"}:
@@ -101,7 +102,7 @@ class MemoryService:
         user_id: str,
         memory_id: int,
         key: str,
-        value: dict[str, Any],
+        value_text: str,
         memory_type: str,
         confidence: float,
         rationale: str,
@@ -113,7 +114,7 @@ class MemoryService:
         if not clean_key:
             raise ValueError("memory_key_required")
         row.memory_key = _KEY_ALIASES.get(clean_key, clean_key)
-        row.memory_value_json = value
+        row.memory_value_text = value_text.strip()
         row.memory_type = memory_type.strip().lower() or "preference"
         row.confidence = max(0.0, min(1.0, float(confidence)))
         row.rationale = rationale.strip()
@@ -172,7 +173,7 @@ class MemoryService:
             candidates.append(
                 MemoryCandidate(
                     key="communication.preference",
-                    value={"text": preference_match.group(2).strip()},
+                    value_text=preference_match.group(2).strip(),
                     memory_type="preference",
                     confidence=0.82,
                     rationale="Explicit preference phrase found in user message.",
@@ -184,7 +185,7 @@ class MemoryService:
             candidates.append(
                 MemoryCandidate(
                     key="portfolio.risk_profile",
-                    value={"text": risk_match.group(2).strip()},
+                    value_text=risk_match.group(2).strip(),
                     memory_type="risk_profile",
                     confidence=0.9,
                     rationale="Explicit risk profile statement found.",
@@ -197,7 +198,7 @@ class MemoryService:
             candidates.append(
                 MemoryCandidate(
                     key="communication.style",
-                    value={"style": style_match.group(2).strip().lower()},
+                    value_text=style_match.group(2).strip().lower(),
                     memory_type="preference",
                     confidence=0.84,
                     rationale="Explicit response-style instruction found.",
@@ -212,7 +213,7 @@ class MemoryService:
                 candidates.append(
                     MemoryCandidate(
                         key="profile.name",
-                        value={"name": normalized},
+                        value_text=normalized,
                         memory_type="identity",
                         confidence=0.96,
                         rationale="Explicit self-identity statement found in user message.",
@@ -245,13 +246,19 @@ class MemoryService:
             if not re.match(r"^[a-z0-9_.-]{3,80}$", key):
                 continue
             raw_value = item.get("value")
-            value: dict[str, Any]
+            value_text: str
             if isinstance(raw_value, dict):
-                value = raw_value
+                if isinstance(raw_value.get("text"), str):
+                    value_text = raw_value.get("text", "")
+                else:
+                    value_text = json.dumps(raw_value, ensure_ascii=True, sort_keys=True)
             elif raw_value is None:
                 continue
             else:
-                value = {"text": raw_value}
+                value_text = str(raw_value)
+            value_text = value_text.strip()
+            if not value_text:
+                continue
             memory_type = str(item.get("memoryType") or item.get("memory_type") or "preference").strip().lower()
             if memory_type not in {"preference", "risk_profile", "identity", "constraint", "instruction"}:
                 memory_type = "preference"
@@ -265,7 +272,7 @@ class MemoryService:
             normalized.append(
                 MemoryCandidate(
                     key=key,
-                    value=value,
+                    value_text=value_text,
                     memory_type=memory_type,
                     confidence=confidence_value,
                     rationale=rationale,
@@ -302,7 +309,7 @@ class MemoryService:
                     thread_id=thread_id,
                     source_message_id=source_message_id,
                     memory_key=item.key,
-                    memory_value_json=item.value,
+                    memory_value_text=item.value_text,
                     memory_type=item.memory_type,
                     confidence=item.confidence,
                     rationale=item.rationale,
@@ -313,9 +320,9 @@ class MemoryService:
                 if item.critical:
                     critical_changed = True
                 continue
-            if existing.memory_value_json == item.value:
+            if existing.memory_value_text == item.value_text:
                 continue
-            existing.memory_value_json = item.value
+            existing.memory_value_text = item.value_text
             existing.memory_type = item.memory_type
             existing.confidence = max(existing.confidence, item.confidence)
             existing.thread_id = thread_id
@@ -345,7 +352,9 @@ class MemoryService:
             summary_age_hours = max(0.0, (now - summary.updated_at).total_seconds() / 3600.0)
             current_version = summary.source_version
 
-        injected_memory_chars = sum(len(item.memory_key) + len(str(item.memory_value_json)) for item in all_memories[: settings.memory_prompt_topk])
+        injected_memory_chars = sum(
+            len(item.memory_key) + len(item.memory_value_text or "") for item in all_memories[: settings.memory_prompt_topk]
+        )
         accepted_since_last = max(0, written_count)
         should_trigger = any(
             (
@@ -362,7 +371,7 @@ class MemoryService:
         if summary is not None and now - summary.updated_at < timedelta(minutes=settings.memory_compression_cooldown_minutes):
             return None
 
-        compact_lines = [f"- {item.memory_key}: {item.memory_value_json}" for item in all_memories[: settings.memory_prompt_topk]]
+        compact_lines = [f"- {item.memory_key}: {item.memory_value_text}" for item in all_memories[: settings.memory_prompt_topk]]
         next_text = "User memory summary:\n" + "\n".join(compact_lines)
         next_text = next_text[: settings.memory_summary_max_chars]
         if summary is None:

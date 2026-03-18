@@ -3,6 +3,7 @@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
+import { BookOpen, Brain, Database, EyeOff, FileText, Loader2, Plus, RotateCcw, Save, Scale } from "lucide-react";
 
 export type ExplorerTab = "documents" | "skills" | "rules" | "memories";
 export type ExplorerEntityType = "document" | "skill" | "rule" | "memory" | "memory_summary";
@@ -26,7 +27,7 @@ type DocsRailProps = {
   committingSnapshot: boolean;
   restoringSnapshot: boolean;
   ruleInput: string;
-  rules: Array<{ id: number; ruleText: string }>;
+  rules: Array<{ id: number; ruleText: string; isActive: boolean }>;
   onRuleInputChange: (value: string) => void;
   onAddRule: () => void;
   onCommitSnapshot: () => void;
@@ -40,6 +41,12 @@ const TAB_LABELS: Record<ExplorerTab, string> = {
   skills: "Skills",
   rules: "Rules",
   memories: "Memories",
+};
+const TAB_ICONS: Record<ExplorerTab, typeof FileText> = {
+  documents: FileText,
+  skills: Brain,
+  rules: Scale,
+  memories: Database,
 };
 
 export function DocsRail({
@@ -69,50 +76,66 @@ export function DocsRail({
         <p className="text-xs font-semibold uppercase tracking-[0.14em] text-stone-700">Explorer</p>
         <div className="flex items-center gap-1">
           {activeTab === "documents" ? (
-            <Button size="sm" variant="outline" className="h-8 rounded-md px-2 text-xs" onClick={onCreateDoc}>
-              New
+            <Button
+              size="icon"
+              variant="outline"
+              className="h-8 w-8 rounded-md"
+              onClick={onCreateDoc}
+              aria-label="New document"
+              title="New document"
+            >
+              <Plus className="h-4 w-4" />
             </Button>
           ) : null}
-          <Button size="sm" variant="ghost" className="h-8 rounded-md px-2 text-xs" onClick={onHide}>
-            Hide
+          <Button size="icon" variant="ghost" className="h-8 w-8 rounded-md" onClick={onHide} aria-label="Hide explorer" title="Hide explorer">
+            <EyeOff className="h-4 w-4" />
           </Button>
         </div>
       </div>
-      <div className="grid grid-cols-2 gap-1 border-b border-stone-300/80 px-2 py-2">
-        {(Object.keys(TAB_LABELS) as ExplorerTab[]).map((tab) => (
-          <Button
-            key={tab}
-            type="button"
-            size="sm"
-            variant={activeTab === tab ? "default" : "outline"}
-            className="h-8 rounded-md text-xs"
-            onClick={() => onSelectTab(tab)}
-          >
-            {TAB_LABELS[tab]}
-          </Button>
-        ))}
+      <div className="flex items-center gap-1 overflow-x-auto border-b border-stone-300/80 px-2 py-2">
+        {(Object.keys(TAB_LABELS) as ExplorerTab[]).map((tab) => {
+          const Icon = TAB_ICONS[tab];
+          return (
+            <Button
+              key={tab}
+              type="button"
+              size="icon"
+              variant={activeTab === tab ? "default" : "outline"}
+              className="h-8 w-8 shrink-0 rounded-md"
+              onClick={() => onSelectTab(tab)}
+              aria-label={TAB_LABELS[tab]}
+              title={TAB_LABELS[tab]}
+            >
+              <Icon className="h-4 w-4" />
+            </Button>
+          );
+        })}
       </div>
       <div className="min-h-0 flex-1 space-y-2 overflow-y-auto px-2 py-2">
         {activeTab === "documents" ? (
           <div className="space-y-2 rounded-lg border border-stone-300/80 bg-background p-2">
             <div className="flex items-center gap-2">
               <Button
-                size="sm"
+                size="icon"
                 variant="outline"
-                className="h-8 px-2 text-xs"
+                className="h-8 w-8"
                 onClick={onCommitSnapshot}
                 disabled={committingSnapshot}
+                aria-label={committingSnapshot ? "Committing snapshot" : "Commit snapshot"}
+                title={committingSnapshot ? "Committing..." : "Commit snapshot"}
               >
-                {committingSnapshot ? "Committing..." : "Commit Snapshot"}
+                {committingSnapshot ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
               </Button>
               <Button
-                size="sm"
+                size="icon"
                 variant="outline"
-                className="h-8 px-2 text-xs"
+                className="h-8 w-8"
                 onClick={onRestoreSnapshot}
                 disabled={!selectedSnapshotId || restoringSnapshot}
+                aria-label={restoringSnapshot ? "Restoring snapshot" : "Restore snapshot"}
+                title={restoringSnapshot ? "Restoring..." : "Restore snapshot"}
               >
-                {restoringSnapshot ? "Restoring..." : "Restore Snapshot"}
+                {restoringSnapshot ? <Loader2 className="h-4 w-4 animate-spin" /> : <RotateCcw className="h-4 w-4" />}
               </Button>
             </div>
             <p className="text-[10px] font-medium uppercase tracking-widest text-stone-600">Workspace Snapshot History</p>
@@ -155,17 +178,25 @@ export function DocsRail({
                 onChange={(event) => onRuleInputChange(event.target.value)}
                 className="h-8 text-xs"
               />
-              <Button size="sm" variant="outline" className="h-8 px-2 text-xs" onClick={onAddRule} disabled={!ruleInput.trim()}>
-                Add
+              <Button
+                size="icon"
+                variant="outline"
+                className="h-8 w-8"
+                onClick={onAddRule}
+                disabled={!ruleInput.trim()}
+                aria-label="Add rule"
+                title="Add rule"
+              >
+                <Plus className="h-4 w-4" />
               </Button>
             </div>
             <div className="max-h-20 space-y-1 overflow-y-auto rounded-md border border-stone-300/80 p-2">
               {rules.length === 0 ? (
-                <p className="text-[11px] text-muted-foreground">No active rules.</p>
+                <p className="text-[11px] text-muted-foreground">No rules yet.</p>
               ) : (
                 rules.map((rule) => (
                   <p key={rule.id} className="truncate text-[11px] text-stone-700">
-                    - {rule.ruleText}
+                    - [{rule.isActive ? "active" : "inactive"}] {rule.ruleText}
                   </p>
                 ))
               )}
@@ -191,7 +222,10 @@ export function DocsRail({
           ))
         )}
         {activeTab === "skills" ? (
-          <p className="px-2 pt-2 text-[11px] text-muted-foreground">Deleted skill rows may reappear after reseed/startup.</p>
+          <p className="px-2 pt-2 text-[11px] text-muted-foreground">
+            <BookOpen className="mr-1 inline h-3.5 w-3.5 align-text-bottom" />
+            Deleted skill rows may reappear after reseed/startup.
+          </p>
         ) : null}
       </div>
     </aside>

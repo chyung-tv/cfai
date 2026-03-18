@@ -23,7 +23,7 @@ def test_rank_and_select_topk_prioritizes_relevance() -> None:
     memory_a = CopilotMemory(
         user_id="u1",
         memory_key="communication.style",
-        memory_value_json={"style": "concise"},
+        memory_value_text="concise",
         memory_type="preference",
         confidence=0.8,
         rationale="",
@@ -33,7 +33,7 @@ def test_rank_and_select_topk_prioritizes_relevance() -> None:
     memory_b = CopilotMemory(
         user_id="u1",
         memory_key="portfolio.risk_profile",
-        memory_value_json={"text": "moderate"},
+        memory_value_text="moderate",
         memory_type="risk_profile",
         confidence=0.7,
         rationale="",
@@ -86,5 +86,5 @@ def test_normalize_suggested_candidates_coerces_scalar_values() -> None:
         ]
     )
     assert len(normalized) == 1
-    assert normalized[0].value == {"text": "please keep replies concise"}
+    assert normalized[0].value_text == "please keep replies concise"
     assert normalized[0].memory_type == "preference"

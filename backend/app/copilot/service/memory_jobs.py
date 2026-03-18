@@ -153,7 +153,7 @@ class MemoryJobRunner:
                 event="memory_written",
                 payload={
                     "memoryKey": item.memory_key,
-                    "memoryValue": item.memory_value_json,
+                    "memoryValue": item.memory_value_text,
                     "threadId": job.thread_id,
                 },
             )

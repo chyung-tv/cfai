@@ -8,7 +8,7 @@ export const streamClient = {
   subscribeNotifications: (
     userId: string,
     handlers: {
-      onMemoryWritten?: (payload: { memoryKey: string; memoryValue: unknown; threadId: string }) => void;
+      onMemoryWritten?: (payload: { memoryKey: string; memoryValue: string; threadId: string }) => void;
       onError?: (error: Event) => void;
     },
   ): (() => void) => {
@@ -16,7 +16,7 @@ export const streamClient = {
     const source = new EventSource(url, { withCredentials: true });
     source.addEventListener("memory_written", (event) => {
       try {
-        const payload = JSON.parse((event as MessageEvent).data) as { memoryKey: string; memoryValue: unknown; threadId: string };
+        const payload = JSON.parse((event as MessageEvent).data) as { memoryKey: string; memoryValue: string; threadId: string };
         handlers.onMemoryWritten?.(payload);
       } catch {
         // Ignore invalid SSE payload.
