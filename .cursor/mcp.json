@@ -3,6 +3,12 @@
     "shadcn": {
       "command": "npx",
       "args": ["shadcn@latest", "mcp"]
-    }
+    },
+    "neon": {
+      "type": "http",
+      "url": "https://mcp.neon.tech/mcp",
+      "headers": {
+        "Authorization": "Bearer napi_e3jky30b3b78mv5xjxqobxa3cp8jnvgehpcqa78x10gc37gxcnan24qb2xyxt5a3"
+      }}
   }
 }

@@ -1,89 +1,45 @@
 # CFAI Architecture Snapshot
 
-Last validated: 2026-03-11 (backend streamline refactor + auth module pruning)
-Purpose: concise target-state + current-state architecture for Phase 1.
+Last validated: 2026-03-17
+Purpose: target architecture for co-editing Canvas MVP.
 
-## 1) System Shape
+## System Shape
 
-- `frontend` (Next.js App Router, shadcn/ui, Tailwind) consumes backend APIs only.
-- `backend` (FastAPI) owns orchestration, maintenance operations, and provider integration for current local milestone scope.
-- Neon-managed `postgres` is source of truth for auth, workflow state/events/artifacts, projections, and catalog.
-- Product interaction hierarchy:
-  - primary user surface: portfolio-home UX
-  - supporting engine: analysis workflow/projections
-  - internal tool: maintenance module (fetch, stock catalogue, mass update analysis)
+- `frontend` (Next.js + shadcn + Tailwind): split-screen workspace only.
+- `backend` (FastAPI): copilot session/chat/document APIs + orchestration.
+- `postgres`: canonical docs, memory, workflow traces/events/artifacts.
 
-## 2) Workflow Domains
+## Domain Modules
 
-- Shared runtime primitives: `backend/app/core/workflow`.
-- Domain packages: `backend/app/workflows/maintenance` and `backend/app/workflows/analysis`.
+- Reusable runtime layer: `backend/app/core/workflow/*`.
+- Copilot domain (new): session, turn orchestration, proposed edits, approval/apply.
+- Memory domain (new):
+  - ledger document
+  - strategy journal document
+  - conversation thread/messages
+  - dynamic philosophy rules
 
-### Maintenance (implemented)
-- Purpose: deterministic catalog seed/refresh into `stock_catalog`.
-- Current shape: top-500 US seed workflow with run tracking and admin APIs.
+## Request Flow (MVP)
 
-### Analysis (implemented core)
-- Purpose: async stock intelligence pipeline supporting portfolio decisions.
-- Node chain: `resolve_query` -> `deep_research` -> `structured_output` -> `reverse_dcf` -> `audit_growth_likelihood` -> `advisor_decision` -> persistence + SSE.
-- Contract: trigger returns processing + trace ID; progress is SSE + persisted events.
-- Operational diagnostics:
-  - trace-level status/timeline API is available for workflow debugging.
-  - persistence inspection API is available at `/analysis/workflows/{trace_id}/persistence` for workflow/artifact/snapshot linkage checks.
-- Mode policy:
-  - default: lightweight path
-  - deep path: explicit user escalation action
+1. Frontend sends chat turn.
+2. Backend orchestrator runs nodes and emits progress events.
+3. Agent returns structured proposed edit for canonical docs.
+4. Frontend shows proposal and requests explicit approval.
+5. Backend applies approved edit and persists revision.
 
-## 3) Data and Read Model
+## Persistence Strategy
 
-- Source-of-truth operational tables:
-  - `analysis_workflows`
-  - `analysis_workflow_events`
-  - `analysis_workflow_artifacts`
-- Frontend read model:
-  - `analysis_symbol_snapshots` and `analysis_candidate_cards` (event/artifact-driven projection outputs)
-  - versioned normalization boundary via `contract_version`
-- Current API read path:
-  - `/analysis/latest` reads projection first, then fallback to workflow row.
-- Portfolio-facing read needs:
-  - candidate card snapshots with freshness metadata
-  - per-symbol fields consumable by portfolio metrics computation
-  - cache-first response semantics
-- Projection persistence policy:
-  - transition-only projection updates must preserve already-materialized artifact-backed fields (no null overwrite regression).
+- Keep workflow events/artifacts as reusable observability primitive.
+- Canonical docs are source of truth for user-visible portfolio workspace.
+- Proposed edits are stored before apply for auditability.
 
-## 4) Auth/RBAC/Quota Boundary
+## Deferred
 
-- Accepted boundary order: auth -> role -> quota (trigger flows).
-- Current reality:
-  - auth/session router and guard modules have been pruned from active backend surface for current local milestone.
-  - role guard is not active on maintenance routes in current flow.
-  - quota guard is not implemented yet.
-  - analysis/maintenance routes are currently open in local milestone flow; policy hardening remains deferred.
+- OCR ingestion and broker sync.
+- Production-grade policy hardening (auth/rbac/quota).
+- Multi-portfolio/account model.
 
-## 5) Provider and Payload Strategy
-
-- Catalog data path is adapter-based and provider-constrained.
-- Deep research is model-provider based; v1 persisted payload remains markdown-first with embedded citations.
-- Heavy node outputs are stored as artifacts/projections, not threaded as large in-memory context.
-- Operational policy for product UX:
-  - default symbol analysis uses lightweight mode for responsiveness/cost control
-  - deep endpoint/model path is secondary and explicit
-
-## 6) Deferred / Open
-
-- Quota implementation and policy observability (deferred in local-first milestone).
-- Finalized auth policy for analysis read/event endpoints (deferred in local-first milestone).
-- Reprojection tooling + stronger projection contract hardening beyond current merge-safe baseline.
-- Seed universe expansion beyond current top-500 proxy set.
-- Account-backed portfolio persistence and multi-portfolio management.
-- Local fallback DB story after Docker removal (if Neon unavailable during development).
-
-## 7) Product Experience Reference
-
-- Product intent, UX hierarchy, and staged rollout are canonicalized in `./product-blueprint.md`.
-- This file should only capture system architecture constraints required to deliver that blueprint.
-
-## 8) References
+## References
 
 - Execution tracker: `./roadmap.md`
 - Decisions: `./architecture-decisions.md`

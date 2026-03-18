@@ -5,14 +5,11 @@ from sqlalchemy import text
 from app.core.config import settings
 from app.core.logging import configure_app_logging
 from app.db.session import AsyncSessionLocal
-from app.providers.advisor_client import AdvisorClient
-from app.providers.fmp_client import FmpClient
-from app.providers.gemini_deep_research import GeminiDeepResearchClient
-from app.routers.maintenance import create_maintenance_router
-from app.routers.workflow import create_workflow_router
-from app.workflows.analysis.orchestrator import WorkflowOrchestrator
-from app.workflows.analysis.sse import SseBroker
-from app.workflows.maintenance.seed_service import CatalogSeedService
+from app.agent import AgentRuntime, DisabledPlaceholderTool, SkillRegistry, ToolRegistry
+from app.copilot.api import create_copilot_router
+from app.copilot.service import CopilotWorkspaceService, MemoryJobRunner, MemoryService, NotificationBroker
+from app.providers.gemini.chat_client import GeminiChatClient
+from app.tools.documents import CreateDocumentTool, EditDocumentTool
 
 configure_app_logging(level=settings.app_log_level)
 
@@ -33,42 +30,63 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-broker = SseBroker()
-fmp_client = FmpClient(
-    api_key=settings.fmp_api_key,
-    base_url=settings.fmp_base_url,
-    timeout_seconds=settings.fmp_timeout_seconds,
+copilot_service = CopilotWorkspaceService()
+tool_registry = ToolRegistry()
+tool_registry.register(
+    EditDocumentTool(
+        session_factory=AsyncSessionLocal,
+        service=copilot_service,
+    )
 )
-gemini_client = GeminiDeepResearchClient(
+tool_registry.register(
+    CreateDocumentTool(
+        session_factory=AsyncSessionLocal,
+        service=copilot_service,
+    )
+)
+tool_registry.register(
+    DisabledPlaceholderTool(
+        name="run_research",
+        description="Execute deeper financial research workflow (planned).",
+    )
+)
+chat_client = GeminiChatClient(
     vertex_api_key=settings.vertex_ai_api_key,
     vertex_project_id=settings.vertex_ai_project_id,
     vertex_location=settings.vertex_ai_location,
     use_vertex_ai=settings.google_genai_use_vertexai,
-    app_env=settings.app_env,
-    agent=settings.deep_research_agent,
-    deep_research_dev_model=settings.deep_research_dev_model,
-    deep_research_dev_grounding_enabled=settings.deep_research_dev_grounding_enabled,
-    deep_research_use_endpoint_in_production=settings.deep_research_use_endpoint_in_production,
-    structured_output_model=settings.structured_output_model,
-    poll_interval_seconds=settings.deep_research_poll_interval_seconds,
-    max_wait_seconds=settings.deep_research_max_wait_seconds,
-    enable_live_calls=settings.deep_research_enable_live_calls,
+    model=settings.llm_flash_lite_model,
+    enable_live_calls=settings.chat_enable_live_calls,
 )
-advisor_client = AdvisorClient(gemini_client=gemini_client)
-workflow_orchestrator = WorkflowOrchestrator(
-    broker,
-    gemini_client,
-    fmp_client,
-    advisor_client,
-)
-seed_service = CatalogSeedService(
-    fmp_client=fmp_client,
+skill_registry = SkillRegistry()
+memory_service = MemoryService()
+notification_broker = NotificationBroker()
+memory_jobs = MemoryJobRunner(
     session_factory=AsyncSessionLocal,
-    target_catalog_size=settings.maintenance_seed_target_count,
-    min_market_cap=settings.maintenance_seed_min_market_cap,
+    memory_service=memory_service,
+    broker=notification_broker,
 )
-app.include_router(create_workflow_router(workflow_orchestrator, broker))
-app.include_router(create_maintenance_router(seed_service))
+agent_runtime = AgentRuntime(chat_client=chat_client, tool_registry=tool_registry)
+app.include_router(
+    create_copilot_router(
+        copilot_service,
+        agent_runtime,
+        skill_registry,
+        memory_service,
+        memory_jobs,
+        notification_broker,
+    )
+)
+
+
+@app.on_event("startup")
+async def startup_memory_jobs() -> None:
+    await memory_jobs.start()
+
+
+@app.on_event("shutdown")
+async def shutdown_memory_jobs() -> None:
+    await memory_jobs.stop()
 
 
 @app.get("/health")

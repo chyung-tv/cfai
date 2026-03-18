@@ -27,7 +27,6 @@ class AnalysisWorkflow(Base):
     id: Mapped[str] = mapped_column(String(36), primary_key=True)
     user_id: Mapped[int | None] = mapped_column(
         Integer,
-        ForeignKey("users.id", ondelete="SET NULL"),
         nullable=True,
         index=True,
     )

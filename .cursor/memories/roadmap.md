@@ -1,7 +1,7 @@
 # CFAI Roadmap
 
-Last validated: 2026-03-11 (backend streamline refactor + auth module pruning)
-Purpose: single source of execution status and next actions.
+Last validated: 2026-03-17 (chat live-call flag split from deep research)
+Purpose: single progress tracker for the pivot to Portfolio Co-Pilot Canvas.
 
 ## Session Briefing (mandatory order)
 
@@ -9,156 +9,79 @@ Purpose: single source of execution status and next actions.
 2. What we need to implement next
 3. What we just implemented
 
-- Where we are at: portfolio-home remains primary product route with P1/P2 interactions and backend metrics contract, while `/demo/analysis` has been repurposed into an internal maintenance module.
-- What we need to implement next: execute Stage P3 (detail reorganization + explicit deep escalation while keeping stale data visible during refresh) on the product-facing detail flow.
-- What we just implemented: single-pass backend streamlining refactor: extracted candidate/portfolio metrics services from router, declarative orchestrator analysis-step execution, legacy endpoint/module pruning, and full auth module removal with active frontend API seam consolidation.
+- Where we are at: split-screen workspace is live with Gemini streaming chat, and code now routes through the new slice boundaries directly.
+- What we need to implement next: implement first real tool path (`edit_document`) behind explicit proposal approvals and deepen copilot service decomposition.
+- What we just implemented: split chat live-call gating from deep-research gating (`CHAT_ENABLE_LIVE_CALLS` vs `DEEP_RESEARCH_ENABLE_LIVE_CALLS`) so test chat can hit Gemini Flash-Lite while deep research remains disabled.
 
 ## Module Status
 
-- [x] Module 1 - Runtime foundation and workflow plumbing
-- [x] Module 2 - Projection-backed analysis read path
-- [x] Module 3 - Portfolio-first UX reframe (docs/contracts)
-- [x] Module 4 - Portfolio home implementation (P1/P2)
-- [~] Module 5 - Detail reorg + deep escalation flow (P3) *(active)*
-- [ ] Module 6 - Internal observation lab boundary + milestone gate (P4)
-
-## Reality Check (2026-03-10)
-
-- Backend analysis workflow exists end-to-end: `resolve_query` -> `deep_research` -> `structured_output` -> `reverse_dcf` -> `audit_growth_likelihood` -> `advisor_decision`.
-- Projection read model exists; `/analysis/latest` is projection-first with fallback.
-- Frontend now has dedicated `/portfolio` route for primary product flow.
-- `/demo/analysis` has been consolidated as internal maintenance module (fetch, stock catalogue, mass update analysis).
-- Product priority changed: portfolio builder is the intended user product, not workflow observability.
-- Quota guard is still deferred; auth/rbac are intentionally relaxed in local milestone flow.
-- Backend now emits app-level JSON workflow logs with trace correlation and exposes `/analysis/workflows/{trace_id}/persistence` for persistence diagnostics.
-- Projection update path now preserves artifact-backed snapshot details during transition-only updates.
+- [x] Module 1 - `.cursor` reset and pivot baseline docs/rules
+- [x] Module 2 - Canonical docs + memory persistence schema
+- [x] Module 3 - Copilot API/domain cutover
+- [x] Module 4 - Split-screen workspace UI cutover
+- [x] Module 5 - Hard cleanup + validation
+- [x] Module 6 - Agent runtime scaffold + streamed chat turn
+- [x] Module 7 - Slice-oriented structure refactor scaffold (compat-preserving)
+- [x] Module 8 - Slice-oriented cleanup (legacy path removal)
+- [x] Module 9 - Runtime flag split (chat vs deep research live calls)
 
 ## Current Focus
 
-- Active slice: post-streamline stabilization after backend architecture cleanup and auth module pruning; then resume Stage P3 detail reorganization and explicit deep escalation flow.
+- Active slice: hard cutover implementation (no legacy compatibility).
+- Active slice: post-cutover agent maturation (direct reply path now streamed; tool execution path scaffolded).
+- Active slice: post-cleanup stabilization on new slice paths only.
 - Owners: user + coding agent.
-- Blockers: none active for seed/observability; see `./debuglog.md` only for newly reproducible issues.
+- Blockers: none.
 
-## Detailed Implementation Queue
+## Active Implementation Queue
 
-### Stage P0 - Product Reframe and Contract Alignment (Done)
+### Stage C0 - Pivot Baseline
 Status: `completed`
-- Update canonical product hierarchy in `product-blueprint.md`.
-- Lock policy: lightweight default + explicit deep.
-- Lock persistence policy: local save only for v1.
+- Recreate `.cursor` memories/rules with fresh-start assumptions.
+- Remove prior product-direction references from execution guidance.
 
-### Stage P1 - Portfolio Home Skeleton (Done)
+### Stage C1 - Persistence Core
 Status: `completed`
-Goal: ship functional portfolio-home interactions using dedicated portfolio route.
+- Add canonical document tables for ledger and strategy journal.
+- Add conversation thread/message and dynamic rules memory tables.
 
-Implementation checklist:
-1. Frontend layout and state model
-   - add portfolio-home two-panel layout shell (left builder, right candidate cards)
-   - define client state for positions and local-save hydration
-   - canonical targets:
-     - `frontend/src/app/portfolio/page.tsx`
-2. Portfolio interactions
-   - drag/add stock into portfolio with default weight
-   - weight edit and remove interactions
-   - empty-state UX for start-empty flow
-3. Candidate cards
-   - render seeded symbol cards with freshness/no-cache cue
-   - wire drag-to-add (required) and click add-to-portfolio action
-4. Local persistence
-   - serialize and restore working portfolio from browser storage
-   - add lightweight schema version key for future migration
-
-Acceptance:
-- user can build a portfolio from empty state and recover it after page reload.
-
-### Stage P2 - Portfolio Metrics and Candidate Ranking
+### Stage C2 - Backend Contract Cutover
 Status: `completed`
-Goal: make the page useful for 1-2 minute portfolio decisions.
+- Replace old `/analysis/*` product contracts with copilot session/chat/document APIs.
+- Keep reusable runtime/orchestrator/provider primitives.
 
-Implementation checklist:
-1. Backend read aggregation
-   - expose projection-backed fields needed for metrics and card cues
-   - canonical targets:
-     - `backend/app/routers/workflow.py`
-     - `backend/app/workflows/analysis/projections/store.py`
-2. Portfolio metrics engine (v1)
-   - compute/render:
-     - `portfolioRiskScore`
-     - `expectedReturnRange`
-     - `sectorConcentrationWarning`
-   - recompute on all position/weight changes
-3. Candidate feed ranking/filtering
-   - implement initial ranking default (`blended` for v1)
-   - preserve responsiveness under cache-first policy
+### Stage C3 - Frontend Workspace
+Status: `completed`
+- Replace default route with split-screen co-editing workspace.
+- Remove old portfolio and maintenance product routes.
 
-Acceptance:
-- key metrics update correctly when portfolio constituents or weights change.
+### Stage C4 - Cleanup and Validation
+Status: `completed`
+- Delete stale legacy APIs/components.
+- Run targeted backend/frontend validation commands.
 
-### Stage P3 - Detail Reorganization and Deep Escalation
-Status: `pending`
-Goal: preserve depth while making detail readable and controllable.
+### Stage C5 - Agent Chat Runtime (v1 direct reply)
+Status: `completed`
+- Add backend agent runtime/types/tool-registry scaffold.
+- Add Gemini chat streaming provider adapter.
+- Add SSE chat turn endpoint with persisted final assistant message/proposal.
+- Update frontend to consume stream and render incremental tokens.
 
-Implementation checklist:
-1. Reorganize detail information hierarchy
-   - summary first, evidence second, deep internals last
-2. Add explicit deep action
-   - show current analysis mode
-   - trigger deep run only from explicit user action
-3. Staleness-window UX
-   - keep cached detail visible during refresh
-   - show progression/status without blanking content
-4. Canonical targets:
-   - `frontend/src/app/demo/analysis/page.tsx`
-   - `backend/app/routers/workflow.py`
-   - `backend/app/workflows/analysis/orchestrator.py`
+### Stage C6 - Architecture Refactor (Slice Scaffold)
+Status: `completed`
+- Introduce `app/agent/{runtime,registry}` and `app/tools/{reply,documents,research}` scaffolding.
+- Introduce `app/copilot/{api,service}` as primary module boundary and route wiring through it.
+- Add compatibility re-exports for legacy imports to avoid breakage during transition.
 
-Acceptance:
-- user can read organized detail quickly and intentionally escalate to deep analysis.
+### Stage C7 - Architecture Refactor (Shim Removal)
+Status: `completed`
+- Remove `app/agents/*`, `app/workflows/copilot/*`, `app/routers/copilot.py`, and old provider shim path.
+- Move frontend source-of-truth to `src/features/workspace/components/*` and `src/shared/api/*`.
+- Delete old frontend workspace component path and old backend API client path.
 
-### Stage P4 - Internal Observation Lab Boundary
-Status: `pending`
-Goal: keep workflow observability available internally without steering product UX.
+## Acceptance Gates
 
-Implementation checklist:
-1. Label and bound analysis-lab role as internal.
-2. Ensure portfolio-home is the default product path.
-3. Keep lab instrumentation useful for debugging and parity checks.
-
-Acceptance:
-- team can still inspect workflow internals while primary UX remains portfolio-first.
-
-## Phase Acceptance Gates
-
-### Module 4 Gate (P1/P2)
-- Portfolio-home supports add/edit/remove flows and local persistence.
-- Risk/return/concentration metrics are visible and reactive.
-
-### Module 5 Gate (P3)
-- Organized detail view and explicit deep escalation are working with clear state transitions.
-
-### Module 6 Gate (P4, phase complete)
-- Portfolio-home and internal observation lab have clear product/tool separation.
-
-## Open Decisions (Execution-Critical)
-
-1. Default add weight: fixed to `5%` for P1; revisit only if user requests rebalance behavior.
-2. Risk/return formula shape for v1: heuristic now vs model-backed now.
-3. Candidate feed default sorting for v1: `blended` (locked 2026-03-11).
-4. Seed refresh policy for initial ~50 stocks: manual vs scheduled.
-
-## Product Blueprint Reference
-
-- Canonical blueprint: `./product-blueprint.md`
-- This roadmap tracks execution status only; product definitions must live in blueprint.
-
-## Working Loop (context-optimized)
-
-1. **Brief** from this file in mandatory order.
-2. **Plan** only the active slice (avoid broad refactors).
-3. **Implement** focused changes.
-4. **Validate** with targeted runtime checks.
-5. **Record**:
-   - progress here
-   - rationale in `architecture-decisions.md` when decisions change
-   - blockers in `debuglog.md`
-   - reusable lessons in `memo.md`
+- User can open new default route and see chat pane + canonical docs pane.
+- User can submit prompt, review proposed edit, approve edit, and persist result.
+- Canonical docs and memory are loaded from backend persistence.
+- No legacy portfolio-first navigation remains.

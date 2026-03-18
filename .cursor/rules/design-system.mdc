@@ -10,5 +10,5 @@ Apply these rules whenever touching frontend or shared UI code (`frontend`, `pac
 1. Use shadcn as the primary component source before building custom UI primitives.
 2. Use Tailwind CSS as the primary styling system; avoid ad-hoc CSS when utilities or design tokens cover the need.
 3. Prefer composing existing shadcn components over creating new parallel component APIs.
-4. When implementing UI from references/specs, prioritize shadcn MCP/component sourcing workflow first.
-5. Keep frontend and shared UI visual behavior consistent by reusing the same patterns, spacing, and interaction states.
+4. Build the co-editing workspace with reusable layout primitives (cards, separators, tabs, alerts, inputs, buttons) from shadcn.
+5. Keep interaction states consistent across chat and document panes (loading, streaming, approval pending, error).

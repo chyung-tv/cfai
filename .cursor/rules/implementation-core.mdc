@@ -10,11 +10,12 @@ alwaysApply: true
    - what we need to implement next
    - what we just implemented
 2. Before non-trivial coding, consult `.cursor/memories/product-blueprint.md` (canonical product target), `.cursor/memories/architecture.md` (system target), and `.cursor/memories/architecture-decisions.md` (accepted rationale), then align plan with user.
-3. Keep changes focused and minimal. Avoid broad refactors unless required by active roadmap scope.
-4. Reuse existing project patterns/components before adding new abstractions.
-5. Do not silently change architecture decisions in `architecture.md`/`architecture-decisions.md`; document any justified deviation and reflect execution impact in roadmap.
-6. Follow the working loop: brief -> plan -> implement -> validate -> record.
-7. Validate behavior after edits, but default to ephemeral checks:
+3. Hard cutover policy is active: do not preserve legacy compatibility paths unless explicitly requested.
+4. Keep changes focused and minimal within current stage; prefer shipping a working vertical slice.
+5. Reuse existing runtime/provider/ui primitives before adding new abstractions.
+6. Do not silently change architecture decisions in `architecture.md`/`architecture-decisions.md`; document justified deviations.
+7. Follow the working loop: brief -> plan -> implement -> validate -> record.
+8. Validate behavior after edits, but default to ephemeral checks:
    - preferred: CLI runs, targeted commands, one-off temporary scripts
    - avoid: creating persisted test files unless explicitly requested by user
-8. If validation is incomplete, clearly report what was not verified and why.
+9. If validation is incomplete, clearly report what was not verified and why.
