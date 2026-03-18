@@ -1,6 +1,6 @@
 # CFAI Product Blueprint (Canonical)
 
-Last validated: 2026-03-17
+Last validated: 2026-03-18
 Purpose: canonical product definition for Portfolio Co-Pilot Canvas.
 
 ## Product Intent
@@ -45,3 +45,9 @@ Purpose: canonical product definition for Portfolio Co-Pilot Canvas.
   - prompt -> agent proposal -> approve edit -> persisted canonical docs.
 - Reload shows latest ledger/journal/rules from backend storage.
 - Product has no dependency on old portfolio-first route model.
+
+## Current Implementation Reality
+
+- Workspace/chat/memory/rules/skills/snapshots are implemented and persisted.
+- AI tool calls currently apply document edits directly when skill policy permits.
+- Explicit proposal -> approval -> apply UX remains the target contract and is tracked as the next alignment slice.

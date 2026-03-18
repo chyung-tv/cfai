@@ -40,11 +40,18 @@ Purpose: lean ADR list for the co-editing pivot.
 - Why: user prefers speed with minimal ceremony.
 - Impact: targeted validation only; avoid broad refactors beyond cutover needs.
 
+### ADR-0006 - Skill-gated direct document tool execution (interim)
+- Date: 2026-03-18
+- Status: `accepted`
+- Why: runtime now executes `create_document`/`edit_document` directly when loaded skill policies allow, enabling working end-to-end edits before proposal UX landed.
+- Impact: current behavior diverges from approval-gated intent; either add proposal/apply flow next or supersede this ADR with a new explicit product decision.
+
 ## Open Decisions
 
 - Auth/rbac/quota hardening schedule after MVP.
 - Final policy for deep research invocation defaults in production.
 - Revision history depth and retention policy for canonical docs.
+- Final resolution for AI document edit contract: proposal/approval gate vs direct apply.
 
 ## References
 

@@ -1,6 +1,6 @@
 # CFAI Roadmap
 
-Last validated: 2026-03-17 (chat live-call flag split from deep research)
+Last validated: 2026-03-18 (workspace/memory reality check)
 Purpose: single progress tracker for the pivot to Portfolio Co-Pilot Canvas.
 
 ## Session Briefing (mandatory order)
@@ -9,9 +9,9 @@ Purpose: single progress tracker for the pivot to Portfolio Co-Pilot Canvas.
 2. What we need to implement next
 3. What we just implemented
 
-- Where we are at: split-screen workspace is live with Gemini streaming chat, and code now routes through the new slice boundaries directly.
-- What we need to implement next: implement first real tool path (`edit_document`) behind explicit proposal approvals and deepen copilot service decomposition.
-- What we just implemented: split chat live-call gating from deep-research gating (`CHAT_ENABLE_LIVE_CALLS` vs `DEEP_RESEARCH_ENABLE_LIVE_CALLS`) so test chat can hit Gemini Flash-Lite while deep research remains disabled.
+- Where we are at: split-screen workspace and copilot APIs are live; chat streams through `AgentRuntime`, and document tools (`create_document`, `edit_document`) execute directly behind skill allowlists.
+- What we need to implement next: add explicit proposal/approval flow for AI document edits (or ratify direct-apply as an ADR) so product intent and runtime behavior are aligned.
+- What we just implemented: memory/skills/rules CRUD, workspace snapshots + restore, and memory-job notifications were integrated into the copilot workspace loop.
 
 ## Module Status
 
@@ -24,12 +24,13 @@ Purpose: single progress tracker for the pivot to Portfolio Co-Pilot Canvas.
 - [x] Module 7 - Slice-oriented structure refactor scaffold (compat-preserving)
 - [x] Module 8 - Slice-oriented cleanup (legacy path removal)
 - [x] Module 9 - Runtime flag split (chat vs deep research live calls)
+- [ ] Module 10 - Proposal/approval alignment for document edits
 
 ## Current Focus
 
-- Active slice: hard cutover implementation (no legacy compatibility).
-- Active slice: post-cutover agent maturation (direct reply path now streamed; tool execution path scaffolded).
-- Active slice: post-cleanup stabilization on new slice paths only.
+- Active slice: post-cutover runtime hardening on new copilot paths only.
+- Active slice: alignment between product intent (approval-gated edits) and runtime behavior (direct tool-applied edits).
+- Active slice: keep deep research tool path disabled/placeholder while chat path stabilizes.
 - Owners: user + coding agent.
 - Blockers: none.
 
@@ -79,9 +80,21 @@ Status: `completed`
 - Move frontend source-of-truth to `src/features/workspace/components/*` and `src/shared/api/*`.
 - Delete old frontend workspace component path and old backend API client path.
 
+### Stage C8 - Workspace Surface Expansion
+Status: `completed`
+- Add workspace snapshots (create/list/restore) for documents + skills + rules + memory state.
+- Add skills/rules/memory CRUD APIs and wire them into the right-pane editor workflow.
+- Add memory-job processing + notification SSE stream for asynchronous memory writes.
+
+### Stage C9 - Proposal/Approval Contract Alignment
+Status: `in_progress`
+- Current behavior: `edit_document` executes within chat turn when skill policy allows.
+- Next requirement: introduce explicit AI edit proposal object + user approval apply path, or formally accept direct-apply in ADR + blueprint updates.
+
 ## Acceptance Gates
 
-- User can open new default route and see chat pane + canonical docs pane.
-- User can submit prompt, review proposed edit, approve edit, and persist result.
-- Canonical docs and memory are loaded from backend persistence.
-- No legacy portfolio-first navigation remains.
+- User can open default route and see split workspace (chats/chat/document/docs rails).
+- User can submit prompt and receive streaming assistant output with tool execution metadata.
+- Canonical docs/rules/skills/memory can be edited and persisted from the workspace.
+- Snapshot create/list/restore works for workspace state persistence.
+- Open gap: explicit proposal->approval->apply loop for AI document edits is not yet implemented.
